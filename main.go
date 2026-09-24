@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"math/rand/v2"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/aaronbittel/boxa/fetch"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -49,7 +52,27 @@ type cell struct {
 }
 
 func main() {
-	sudoku := initFilledSudoku()
+	var sudoku sudoku
+
+	if len(os.Args) >= 2 {
+		data := fetch.FetchSudoku(os.Args[1])
+		if len(data.Cells) != cellCount {
+			panic("illegal cell count")
+		}
+		for y := range cellCount {
+			for x := range cellCount {
+				if data.Cells[y][x].Value != "" {
+					n, err := strconv.Atoi(data.Cells[y][x].Value)
+					if err != nil {
+						log.Fatal(err)
+					}
+					sudoku[y][x].value = n
+				}
+			}
+		}
+	} else {
+		sudoku = initFilledSudoku()
+	}
 
 	rl.InitWindow(width, height, "Boxa")
 	defer rl.CloseWindow()
