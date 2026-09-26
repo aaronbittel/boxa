@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"math/rand/v2"
 	"os"
 	"strconv"
 	"strings"
@@ -24,8 +23,14 @@ const (
 	selectionMargin    = 15
 
 	cellNumberFontSize = cellSize * 0.7
+)
 
-	emptyCell = 0
+type SelectionMode int
+
+const (
+	SelectionUnset SelectionMode = iota
+	SelectionSelect
+	SelectionDeselect
 )
 
 var highlightColor = rl.NewColor(0x4C, 0xA4, 0xFF, 0xFF)
@@ -42,17 +47,9 @@ var pencilMarkCornerOffsets = [cellCount]rl.Vector2{
 	{X: 1, Y: 1},
 }
 
-type sudoku [cellCount][cellCount]cell
-
-type cell struct {
-	value       int
-	selected    bool
-	cornerMarks [cellCount]bool
-	centerMarks [cellCount]bool
-}
-
 func main() {
 	var sudoku sudoku
+	selectionMode := SelectionUnset
 
 	if len(os.Args) >= 2 {
 		data := fetch.FetchSudoku(os.Args[1])
@@ -77,69 +74,74 @@ func main() {
 	rl.InitWindow(width, height, "Boxa")
 	defer rl.CloseWindow()
 
-	inSelectionMode := true
+	input := Input{
+		mouse: MouseState{
+			VisitedCells: map[Cell]struct{}{},
+		},
+	}
 
 	rl.SetTargetFPS(60)
 
 	for !rl.WindowShouldClose() {
-		if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
-			if !rl.IsKeyDown(rl.KeyLeftControl) {
-				sudoku.unselectAllCells()
-			}
-			x, y := positionToCellIdx(rl.GetMousePosition())
-			if isInsideSelectionArea(rl.GetMousePosition(), x, y) {
-				inSelectionMode = !sudoku[y][x].selected
-			}
-		}
+		events := input.handle()
 
-		if rl.IsMouseButtonDown(rl.MouseButtonLeft) {
-			x, y := positionToCellIdx(rl.GetMousePosition())
-			if isInsideSelectionArea(rl.GetMousePosition(), x, y) {
-				if inSelectionMode {
-					sudoku[y][x].selected = true
+		for _, event := range events {
+			switch event.Type {
+			case EventMousePressed:
+				if sudoku.isSelected(event.Cell.Col, event.Cell.Row) {
+					selectionMode = SelectionDeselect
 				} else {
-					sudoku[y][x].selected = false
+					selectionMode = SelectionSelect
 				}
-			}
-		}
-
-		if rl.IsKeyPressed(rl.KeyBackspace) {
-			for y := range cellCount {
-				for x := range cellCount {
-					if !sudoku[y][x].selected {
-						continue
-					}
-
-					if !sudoku.isEmpty(x, y) {
-						sudoku[y][x].value = emptyCell
-					} else {
-						sudoku[y][x].cornerMarks = [cellCount]bool{}
-						sudoku[y][x].centerMarks = [cellCount]bool{}
-					}
+				if !event.Modifiers.Ctrl {
+					sudoku.unselectAllCells()
 				}
-			}
-		}
-
-		num, pressed := getNumberPressed()
-		if pressed {
-			for y := range cellCount {
-				for x := range cellCount {
-					if !sudoku[y][x].selected {
-						continue
-					}
-
+				sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
+			case EventMouseCellEntered:
+				switch selectionMode {
+				case SelectionSelect:
+					sudoku.selectCell(event.Cell.Col, event.Cell.Row)
+				case SelectionDeselect:
+					sudoku.deselectCell(event.Cell.Col, event.Cell.Row)
+				default:
+					panic("invalid selection mode in dragging")
+				}
+			case EventMouseReleased:
+				selectionMode = SelectionUnset
+			case EventKeyPressed:
+				switch event.Key {
+				case KeyOne, KeyTwo, KeyThree, KeyFour, KeyFive, KeySix, KeySeven, KeyEight, KeyNine:
 					switch {
-					case rl.IsKeyDown(rl.KeyLeftShift):
-						if sudoku.isEmpty(x, y) {
-							sudoku[y][x].cornerMarks[num-1] = !sudoku[y][x].cornerMarks[num-1]
-						}
-					case rl.IsKeyDown(rl.KeyLeftControl):
-						if sudoku.isEmpty(x, y) {
-							sudoku[y][x].centerMarks[num-1] = !sudoku[y][x].centerMarks[num-1]
-						}
+					case event.Modifiers.Shift:
+						sudoku.forEachSelectedCell(func(cell *cellState) {
+							cell.cornerMarks[event.Key-1] = !cell.cornerMarks[event.Key-1]
+						})
+					case event.Modifiers.Ctrl:
+						sudoku.forEachSelectedCell(func(cell *cellState) {
+							cell.centerMarks[event.Key-1] = !cell.centerMarks[event.Key-1]
+						})
 					default:
-						sudoku[y][x].value = num
+						sudoku.forEachSelectedCell(func(cell *cellState) {
+							cell.value = int(event.Key)
+						})
 					}
+				case KeyDelete:
+					switch {
+					case event.Modifiers.Shift:
+						sudoku.forEachSelectedCell(func(cell *cellState) {
+							cell.cornerMarks = [cellCount]bool{}
+						})
+					case event.Modifiers.Ctrl:
+						sudoku.forEachSelectedCell(func(cell *cellState) {
+							cell.centerMarks = [cellCount]bool{}
+						})
+					default:
+						sudoku.forEachSelectedCell(func(cell *cellState) {
+							cell.value = emptyCell
+						})
+					}
+				default:
+					panic("unknown key")
 				}
 			}
 		}
@@ -314,28 +316,8 @@ func drawSelectedCell(y, x int) {
 	rl.DrawRectangleLinesEx(rec, borderThickness, rl.Blue)
 }
 
-func initFilledSudoku() sudoku {
-	s := sudoku{}
-	for y := range cellCount {
-		for x := range cellCount {
-			if rand.IntN(100) < 20 {
-				s[y][x].value = rand.IntN(cellCount) + 1
-			}
-		}
-	}
-	return s
-}
-
 func positionToCellIdx(pos rl.Vector2) (x, y int) {
 	return min(cellCount-1, int(pos.X/cellSize)), min(cellCount-1, int(pos.Y/cellSize))
-}
-
-func (s *sudoku) unselectAllCells() {
-	for y := range cellCount {
-		for x := range cellCount {
-			s[y][x].selected = false
-		}
-	}
 }
 
 func isInsideSelectionArea(pos rl.Vector2, x, y int) bool {
@@ -353,33 +335,4 @@ func isInsideSelectionArea(pos rl.Vector2, x, y int) bool {
 	}
 
 	return rl.CheckCollisionPointRec(pos, r1) || rl.CheckCollisionPointRec(pos, r2)
-}
-
-func getNumberPressed() (int, bool) {
-	switch {
-	case rl.IsKeyPressed(rl.KeyOne), rl.IsKeyPressed(rl.KeyKp1):
-		return 1, true
-	case rl.IsKeyPressed(rl.KeyTwo), rl.IsKeyPressed(rl.KeyKp2):
-		return 2, true
-	case rl.IsKeyPressed(rl.KeyThree), rl.IsKeyPressed(rl.KeyKp3):
-		return 3, true
-	case rl.IsKeyPressed(rl.KeyFour), rl.IsKeyPressed(rl.KeyKp4):
-		return 4, true
-	case rl.IsKeyPressed(rl.KeyFive), rl.IsKeyPressed(rl.KeyKp5):
-		return 5, true
-	case rl.IsKeyPressed(rl.KeySix), rl.IsKeyPressed(rl.KeyKp6):
-		return 6, true
-	case rl.IsKeyPressed(rl.KeySeven), rl.IsKeyPressed(rl.KeyKp7):
-		return 7, true
-	case rl.IsKeyPressed(rl.KeyEight), rl.IsKeyPressed(rl.KeyKp8):
-		return 8, true
-	case rl.IsKeyPressed(rl.KeyNine), rl.IsKeyPressed(rl.KeyKp9):
-		return 9, true
-	}
-
-	return 0, false
-}
-
-func (s sudoku) isEmpty(x, y int) bool {
-	return s[y][x].value == emptyCell
 }
