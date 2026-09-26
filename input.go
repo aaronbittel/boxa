@@ -45,6 +45,13 @@ const (
 	KeyDelete
 )
 
+func (k Key) Value() int {
+	if k < KeyOne || k > KeyNine {
+		panic("key has no Sudoku value")
+	}
+	return int(k)
+}
+
 type Modifiers struct {
 	Ctrl  bool
 	Shift bool

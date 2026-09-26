@@ -13,6 +13,32 @@ type cellState struct {
 	centerMarks [cellCount]bool
 }
 
+func (c *cellState) toggleCornerMark(index int) {
+	if index < 0 || index >= cellCount {
+		panic("invalid corner index")
+	}
+	c.cornerMarks[index] = !c.cornerMarks[index]
+}
+
+func (c *cellState) toggleCenterMark(index int) {
+	if index < 0 || index >= cellCount {
+		panic("invalid center index")
+	}
+	c.centerMarks[index] = !c.centerMarks[index]
+}
+
+func (c *cellState) clearCornerMarks() {
+	c.cornerMarks = [cellCount]bool{}
+}
+
+func (c *cellState) clearCenterMarks() {
+	c.centerMarks = [cellCount]bool{}
+}
+
+func (c *cellState) clearNumber() {
+	c.value = emptyCell
+}
+
 func (s *sudoku) toggleCornerMark(num int) {
 	s.forEachSelectedCell(func(cell *cellState) {
 		cell.cornerMarks[num] = !cell.cornerMarks[num]

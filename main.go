@@ -49,7 +49,6 @@ var pencilMarkCornerOffsets = [cellCount]rl.Vector2{
 
 func main() {
 	var sudoku sudoku
-	selectionMode := SelectionUnset
 
 	if len(os.Args) >= 2 {
 		data := fetch.FetchSudoku(os.Args[1])
@@ -74,11 +73,8 @@ func main() {
 	rl.InitWindow(width, height, "Boxa")
 	defer rl.CloseWindow()
 
-	input := Input{
-		mouse: MouseState{
-			VisitedCells: map[Cell]struct{}{},
-		},
-	}
+	var input Input
+	selectionMode := SelectionUnset
 
 	rl.SetTargetFPS(60)
 
@@ -86,64 +82,7 @@ func main() {
 		events := input.handle()
 
 		for _, event := range events {
-			switch event.Type {
-			case EventMousePressed:
-				if sudoku.isSelected(event.Cell.Col, event.Cell.Row) {
-					selectionMode = SelectionDeselect
-				} else {
-					selectionMode = SelectionSelect
-				}
-				if !event.Modifiers.Ctrl {
-					sudoku.unselectAllCells()
-				}
-				sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
-			case EventMouseCellEntered:
-				switch selectionMode {
-				case SelectionSelect:
-					sudoku.selectCell(event.Cell.Col, event.Cell.Row)
-				case SelectionDeselect:
-					sudoku.deselectCell(event.Cell.Col, event.Cell.Row)
-				default:
-					panic("invalid selection mode in dragging")
-				}
-			case EventMouseReleased:
-				selectionMode = SelectionUnset
-			case EventKeyPressed:
-				switch event.Key {
-				case KeyOne, KeyTwo, KeyThree, KeyFour, KeyFive, KeySix, KeySeven, KeyEight, KeyNine:
-					switch {
-					case event.Modifiers.Shift:
-						sudoku.forEachSelectedCell(func(cell *cellState) {
-							cell.cornerMarks[event.Key-1] = !cell.cornerMarks[event.Key-1]
-						})
-					case event.Modifiers.Ctrl:
-						sudoku.forEachSelectedCell(func(cell *cellState) {
-							cell.centerMarks[event.Key-1] = !cell.centerMarks[event.Key-1]
-						})
-					default:
-						sudoku.forEachSelectedCell(func(cell *cellState) {
-							cell.value = int(event.Key)
-						})
-					}
-				case KeyDelete:
-					switch {
-					case event.Modifiers.Shift:
-						sudoku.forEachSelectedCell(func(cell *cellState) {
-							cell.cornerMarks = [cellCount]bool{}
-						})
-					case event.Modifiers.Ctrl:
-						sudoku.forEachSelectedCell(func(cell *cellState) {
-							cell.centerMarks = [cellCount]bool{}
-						})
-					default:
-						sudoku.forEachSelectedCell(func(cell *cellState) {
-							cell.value = emptyCell
-						})
-					}
-				default:
-					panic("unknown key")
-				}
-			}
+			handleEvent(event, &sudoku, &selectionMode)
 		}
 
 		rl.BeginDrawing()
@@ -154,6 +93,85 @@ func main() {
 		drawGrid()
 
 		rl.EndDrawing()
+	}
+}
+
+func handleEvent(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
+	switch event.Type {
+	case EventMousePressed:
+		handleSingleClick(event, sudoku, selectionMode)
+	case EventMouseCellEntered:
+		handleDragging(event, sudoku, selectionMode)
+	case EventMouseReleased:
+		*selectionMode = SelectionUnset
+	case EventKeyPressed:
+		switch event.Key {
+		case KeyOne, KeyTwo, KeyThree, KeyFour, KeyFive, KeySix, KeySeven, KeyEight, KeyNine:
+			handleNumberKey(event, sudoku)
+		case KeyDelete:
+			handleDeleteKey(event, sudoku)
+		}
+	}
+}
+
+func handleDragging(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
+	switch *selectionMode {
+	case SelectionSelect:
+		sudoku.selectCell(event.Cell.Col, event.Cell.Row)
+	case SelectionDeselect:
+		sudoku.deselectCell(event.Cell.Col, event.Cell.Row)
+	}
+}
+
+func handleSingleClick(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
+	if sudoku.isSelected(event.Cell.Col, event.Cell.Row) {
+		*selectionMode = SelectionDeselect
+	} else {
+		*selectionMode = SelectionSelect
+	}
+	if !event.Modifiers.Ctrl {
+		sudoku.unselectAllCells()
+	}
+	sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
+}
+
+func handleDeleteKey(event Event, sudoku *sudoku) {
+	switch {
+	case event.Modifiers.Shift:
+		sudoku.forEachSelectedCell(func(cell *cellState) {
+			cell.clearCornerMarks()
+		})
+	case event.Modifiers.Ctrl:
+		sudoku.forEachSelectedCell(func(cell *cellState) {
+			cell.clearCenterMarks()
+		})
+	default:
+		sudoku.forEachSelectedCell(func(cell *cellState) {
+			cell.clearNumber()
+		})
+	}
+}
+
+func handleNumberKey(event Event, sudoku *sudoku) {
+	value := event.Key.Value()
+	index := value - 1
+	switch {
+	case event.Modifiers.Shift:
+		sudoku.forEachSelectedCell(func(cell *cellState) {
+			if sudoku.isEmpty(event.Cell.Col, event.Cell.Row) {
+				cell.toggleCornerMark(index)
+			}
+		})
+	case event.Modifiers.Ctrl:
+		sudoku.forEachSelectedCell(func(cell *cellState) {
+			if sudoku.isEmpty(event.Cell.Col, event.Cell.Row) {
+				cell.toggleCenterMark(index)
+			}
+		})
+	default:
+		sudoku.forEachSelectedCell(func(cell *cellState) {
+			cell.value = value
+		})
 	}
 }
 
