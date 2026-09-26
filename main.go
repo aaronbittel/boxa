@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -18,11 +17,11 @@ const (
 	width     = cellSize * cellCount
 	height    = cellSize * cellCount
 
-	borderThickness    = 4.0
+	borderThickness    = 4
 	highlightThickness = 9
 	selectionMargin    = 15
 
-	cellNumberFontSize = cellSize * 0.7
+	cellNumberFontSize float32 = cellSize * 0.7
 )
 
 type SelectionMode int
@@ -73,6 +72,9 @@ func main() {
 	rl.InitWindow(width, height, "Boxa")
 	defer rl.CloseWindow()
 
+	font := rl.LoadFontEx("./fonts/DejaVuSans.ttf", 64, nil, 0)
+	defer rl.UnloadFont(font)
+
 	var input Input
 	selectionMode := SelectionUnset
 
@@ -89,7 +91,7 @@ func main() {
 		rl.ClearBackground(rl.RayWhite)
 
 		drawSelectedBorders(sudoku)
-		drawSudoku(sudoku)
+		drawSudoku(sudoku, font)
 		drawGrid()
 
 		rl.EndDrawing()
@@ -226,50 +228,57 @@ func drawGrid() {
 
 }
 
-func drawSudoku(s sudoku) {
+func drawSudoku(s sudoku, font rl.Font) {
 	for y := range cellCount {
 		for x := range cellCount {
 			if !s.isEmpty(x, y) {
-				drawCellNumber(s, x, y)
+				drawCellNumber(s, x, y, font)
 			} else {
-				drawCornerMarks(s, x, y)
-				drawCenterMarks(s, x, y)
+				drawCornerMarks(s, x, y, font)
+				drawCenterMarks(s, x, y, font)
 			}
 		}
 	}
 }
-func drawCellNumber(s sudoku, x, y int) {
-	cellX := int32(x * cellSize)
-	cellY := int32(y * cellSize)
+func drawCellNumber(s sudoku, x, y int, font rl.Font) {
+	cellX := float32(x * cellSize)
+	cellY := float32(y * cellSize)
 
 	text := strconv.Itoa(s[y][x].value)
-	fontSize := int32(math.Round(cellNumberFontSize))
-	textWidth := rl.MeasureText(text, fontSize)
-	rl.DrawText(text, cellX+(cellSize-textWidth)/2, cellY+14, fontSize, rl.Blue)
+	textWidth := rl.MeasureTextEx(font, text, cellNumberFontSize, 0.0)
+	pos := rl.Vector2{
+		X: cellX + (cellSize-textWidth.X)/2,
+		Y: cellY + 14.0,
+	}
+	rl.DrawTextEx(font, text, pos, cellNumberFontSize, 0.0, rl.Blue)
 }
 
-func drawCornerMarks(s sudoku, x, y int) {
-	cellX := int32(x * cellSize)
-	cellY := int32(y * cellSize)
-	cornerSize := int32((cellSize - 2*highlightThickness) / 3)
+func drawCornerMarks(s sudoku, x, y int, font rl.Font) {
+	cellX := float32(x * cellSize)
+	cellY := float32(y * cellSize)
+	cornerSize := float32((cellSize - 2*highlightThickness)) / 3
 	i := 0
 	for j, c := range s[y][x].cornerMarks {
 		num := j + 1
 		if c {
 			text := strconv.Itoa(num)
-			markWidth := rl.MeasureText(text, cornerSize)
+			markSize := rl.MeasureTextEx(font, text, cornerSize, 0.0)
 
 			offset := pencilMarkCornerOffsets[i]
-			markX := cellX + highlightThickness + int32(offset.X)*cornerSize + (cornerSize-markWidth)/2
-			markY := cellY + highlightThickness + int32(offset.Y)*cornerSize + 4
+			markX := cellX + highlightThickness + offset.X*cornerSize + (cornerSize-markSize.X)/2
+			markY := cellY + highlightThickness + offset.Y*cornerSize + 4
 
-			rl.DrawText(text, int32(markX), int32(markY), cornerSize, rl.Blue)
+			pos := rl.Vector2{
+				X: markX,
+				Y: markY,
+			}
+			rl.DrawTextEx(font, text, pos, cornerSize, 0.0, rl.Blue)
 			i++
 		}
 	}
 }
 
-func drawCenterMarks(s sudoku, x, y int) {
+func drawCenterMarks(s sudoku, x, y int, font rl.Font) {
 	var sb strings.Builder
 
 	for i, marked := range s[y][x].centerMarks {
@@ -283,19 +292,21 @@ func drawCenterMarks(s sudoku, x, y int) {
 	}
 
 	text := sb.String()
-	var padding int32 = 4
+	var padding float32 = 4.0
 
-	fontSize := int32(math.Round(cellNumberFontSize / 2))
-	textWidth := rl.MeasureText(text, fontSize)
-	for textWidth+padding > cellSize {
+	fontSize := cellNumberFontSize / 2
+	textSize := rl.MeasureTextEx(font, text, fontSize, 0.0)
+	for textSize.X+padding > cellSize {
 		fontSize--
-		textWidth = rl.MeasureText(text, fontSize)
+		textSize = rl.MeasureTextEx(font, text, fontSize, 0.0)
 	}
 
-	cellX := int32(x * cellSize)
-	cellY := int32(y * cellSize)
+	pos := rl.Vector2{
+		X: float32(x*cellSize) + float32((cellSize)-textSize.X)/2,
+		Y: float32(y*cellSize) + float32((cellSize-fontSize))/2 + 2,
+	}
 
-	rl.DrawText(text, cellX+(cellSize-textWidth)/2, cellY+(cellSize-fontSize)/2+2, fontSize, rl.Blue)
+	rl.DrawTextEx(font, text, pos, fontSize, 0.0, rl.Blue)
 }
 
 func drawSelectedBorders(s sudoku) {
