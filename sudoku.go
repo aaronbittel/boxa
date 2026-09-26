@@ -1,6 +1,9 @@
 package main
 
-import "math/rand/v2"
+import (
+	"math/rand/v2"
+	"slices"
+)
 
 const emptyCell = 0
 
@@ -37,6 +40,36 @@ func (c *cellState) clearCenterMarks() {
 
 func (c *cellState) clearNumber() {
 	c.value = emptyCell
+}
+
+func (c *cellState) isEmpty() bool {
+	return c.value == emptyCell
+}
+
+func (c *cellState) hasCenterMarks() bool {
+	return slices.Contains(c.centerMarks[:], true)
+}
+
+func (c *cellState) hasCornerMarks() bool {
+	return slices.Contains(c.cornerMarks[:], true)
+}
+
+func (c *cellState) containsCenterMarksOf(other cellState) bool {
+	for i, marked := range other.centerMarks {
+		if marked && !c.centerMarks[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *cellState) containsCornerMarksOf(other cellState) bool {
+	for i, marked := range other.cornerMarks {
+		if marked && !c.cornerMarks[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *sudoku) toggleCornerMark(num int) {
@@ -90,7 +123,7 @@ func (s *sudoku) toggleSelection(x, y int) {
 }
 
 func (s sudoku) isEmpty(x, y int) bool {
-	return s[y][x].value == emptyCell
+	return s[y][x].isEmpty()
 }
 
 func (s *sudoku) unselectAllCells() {

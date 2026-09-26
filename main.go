@@ -120,8 +120,20 @@ func handleDoubleClick(event Event, sudoku *sudoku) {
 	if !event.Modifiers.Ctrl {
 		sudoku.unselectAllCells()
 	}
-	sudoku.selectIf(func(cell cellState) bool {
-		return cell.value == sudoku.at(event.Cell.Col, event.Cell.Row).value
+
+	clickedCell := sudoku.at(event.Cell.Col, event.Cell.Row)
+	clickedCell.selected = true
+
+	sudoku.selectIf(func(candidate cellState) bool {
+		switch {
+		case !candidate.isEmpty():
+			return candidate.value == clickedCell.value
+		case clickedCell.hasCenterMarks():
+			return candidate.containsCenterMarksOf(clickedCell)
+		case clickedCell.hasCornerMarks():
+			return candidate.containsCornerMarksOf(clickedCell)
+		}
+		return false
 	})
 }
 
