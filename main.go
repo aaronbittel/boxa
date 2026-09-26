@@ -102,6 +102,8 @@ func handleEvent(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
 		handleSingleClick(event, sudoku, selectionMode)
 	case EventMouseCellEntered:
 		handleDragging(event, sudoku, selectionMode)
+	case EventMouseDoubleClick:
+		handleDoubleClick(event, sudoku)
 	case EventMouseReleased:
 		*selectionMode = SelectionUnset
 	case EventKeyPressed:
@@ -112,6 +114,15 @@ func handleEvent(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
 			handleDeleteKey(event, sudoku)
 		}
 	}
+}
+
+func handleDoubleClick(event Event, sudoku *sudoku) {
+	if !event.Modifiers.Ctrl {
+		sudoku.unselectAllCells()
+	}
+	sudoku.selectIf(func(cell cellState) bool {
+		return cell.value == sudoku.at(event.Cell.Col, event.Cell.Row).value
+	})
 }
 
 func handleDragging(event Event, sudoku *sudoku, selectionMode *SelectionMode) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -12,6 +13,7 @@ const (
 	EventMousePressed EventType = iota
 	EventMouseCellEntered
 	EventMouseReleased
+	EventMouseDoubleClick
 	EventKeyPressed
 )
 
@@ -23,6 +25,8 @@ func (et EventType) String() string {
 		return "MouseCellEntered"
 	case EventMouseReleased:
 		return "MouseReleased"
+	case EventMouseDoubleClick:
+		return "MouseDoubleClick"
 	case EventKeyPressed:
 		return "KeyPressed"
 	default:
@@ -52,6 +56,8 @@ func (k Key) Value() int {
 	return int(k)
 }
 
+const doubleClickTimeThreshold = 500 * time.Millisecond
+
 type Modifiers struct {
 	Ctrl  bool
 	Shift bool
@@ -78,13 +84,19 @@ type Input struct {
 }
 
 type MouseState struct {
-	Active       bool
-	VisitedCells map[Cell]struct{}
+	Active        bool
+	VisitedCells  map[Cell]struct{}
+	lastCell      Cell
+	lastClickTime time.Time
+}
+
+func (ms MouseState) isDoubleClick(currentCell Cell) bool {
+	return currentCell == ms.lastCell && time.Since(ms.lastClickTime) < doubleClickTimeThreshold
 }
 
 func (e Event) String() string {
 	switch e.Type {
-	case EventMousePressed, EventMouseCellEntered, EventMouseReleased:
+	case EventMousePressed, EventMouseCellEntered, EventMouseReleased, EventMouseDoubleClick:
 		return fmt.Sprintf("%s(%s)", e.Type, e.Cell)
 	case EventKeyPressed:
 		return fmt.Sprintf("%s(%s)", e.Type, e.Key)
@@ -103,33 +115,47 @@ func (i *Input) handle() []Event {
 	}
 
 	x, y := positionToCellIdx(mousePos)
-	cell := Cell{Row: y, Col: x}
+	currentCell := Cell{Row: y, Col: x}
+	now := time.Now()
+	defer func() {
+		i.mouse.lastCell = currentCell
+	}()
 
 	switch {
 	case rl.IsMouseButtonPressed(rl.MouseButtonLeft):
 		i.mouse.Active = true
 		i.mouse.VisitedCells = map[Cell]struct{}{
-			cell: {},
+			currentCell: {},
 		}
-		events = append(events, Event{
-			Type:      EventMousePressed,
-			Cell:      cell,
-			Modifiers: modifiers,
-		})
+		if i.mouse.isDoubleClick(currentCell) {
+			i.mouse.lastClickTime = time.Time{}
+			events = append(events, Event{
+				Type:      EventMouseDoubleClick,
+				Cell:      currentCell,
+				Modifiers: modifiers,
+			})
+		} else {
+			i.mouse.lastClickTime = now
+			events = append(events, Event{
+				Type:      EventMousePressed,
+				Cell:      currentCell,
+				Modifiers: modifiers,
+			})
+		}
 	case rl.IsMouseButtonDown(rl.MouseButtonLeft):
 		if !i.mouse.Active {
 			panic("invalid input state, must be active")
 		}
-		if _, visited := i.mouse.VisitedCells[cell]; visited {
+		if _, visited := i.mouse.VisitedCells[currentCell]; visited {
 			break
 		}
 		if !isInsideSelectionArea(mousePos, x, y) {
 			break
 		}
-		i.mouse.VisitedCells[cell] = struct{}{}
+		i.mouse.VisitedCells[currentCell] = struct{}{}
 		events = append(events, Event{
 			Type:      EventMouseCellEntered,
-			Cell:      cell,
+			Cell:      currentCell,
 			Modifiers: modifiers,
 		})
 	case rl.IsMouseButtonReleased(rl.MouseButtonLeft):
@@ -139,7 +165,7 @@ func (i *Input) handle() []Event {
 		i.mouse.Active = false
 		events = append(events, Event{
 			Type:      EventMouseReleased,
-			Cell:      cell,
+			Cell:      currentCell,
 			Modifiers: modifiers,
 		})
 	}
@@ -147,7 +173,7 @@ func (i *Input) handle() []Event {
 	pressed := true
 	keyEvent := Event{
 		Type:      EventKeyPressed,
-		Cell:      cell,
+		Cell:      currentCell,
 		Modifiers: modifiers,
 	}
 

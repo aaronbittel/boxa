@@ -45,6 +45,23 @@ func (s *sudoku) toggleCornerMark(num int) {
 	})
 }
 
+func (s *sudoku) selectIf(predicate func(cell cellState) bool) {
+	for y := range cellCount {
+		for x := range cellCount {
+			if predicate(s[y][x]) {
+				s[y][x].selected = true
+			}
+		}
+	}
+}
+
+func (s *sudoku) at(x, y int) cellState {
+	if x < 0 || x >= cellCount || y < 0 || y >= cellCount {
+		panic("invalid position")
+	}
+	return s[y][x]
+}
+
 func (s *sudoku) forEachSelectedCell(fn func(cell *cellState)) {
 	for y := range cellCount {
 		for x := range cellCount {
