@@ -76,9 +76,9 @@ func (c *cellState) containsCornerMarksOf(other cellState) bool {
 }
 
 func (s *sudoku) hasConflictFor(x, y, value int) bool {
-	return s.hasColConflict(x, y, value) ||
-		s.hasRowConflict(x, y, value) ||
-		s.hasBoxConflict(x, y, value)
+	return s.hasNumberInCol(x, y, value) ||
+		s.hasNumberInRow(x, y, value) ||
+		s.hasNumberInBox(x, y, value)
 }
 
 func (s *sudoku) hasCellConflict(x, y int) bool {
@@ -92,7 +92,7 @@ func (s *sudoku) hasCenterMarks(x, y int) bool {
 	return s.at(x, y).hasCenterMarks()
 }
 
-func (s *sudoku) hasRowConflict(x, y, value int) bool {
+func (s *sudoku) hasNumberInRow(x, y, value int) bool {
 	for xo := range cellCount {
 		if x == xo {
 			continue
@@ -104,7 +104,7 @@ func (s *sudoku) hasRowConflict(x, y, value int) bool {
 	return false
 }
 
-func (s *sudoku) hasColConflict(x, y, value int) bool {
+func (s *sudoku) hasNumberInCol(x, y, value int) bool {
 	for yo := range cellCount {
 		if y == yo {
 			continue
@@ -116,7 +116,7 @@ func (s *sudoku) hasColConflict(x, y, value int) bool {
 	return false
 }
 
-func (s *sudoku) hasBoxConflict(x, y, value int) bool {
+func (s *sudoku) hasNumberInBox(x, y, value int) bool {
 	boxX := (x / 3) * 3
 	boxY := (y / 3) * 3
 
