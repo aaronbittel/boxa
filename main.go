@@ -62,6 +62,7 @@ func main() {
 						log.Fatal(err)
 					}
 					sudoku[y][x].value = n
+					sudoku[y][x].given = true
 				}
 			}
 		}
@@ -250,7 +251,12 @@ func drawCellNumber(s sudoku, x, y int, font rl.Font) {
 		X: cellX + (cellSize-textWidth.X)/2,
 		Y: cellY + 14.0,
 	}
-	rl.DrawTextEx(font, text, pos, cellNumberFontSize, 0.0, rl.Blue)
+
+	color := rl.Blue
+	if s.at(x, y).given {
+		color = rl.Black
+	}
+	rl.DrawTextEx(font, text, pos, cellNumberFontSize, 0.0, color)
 }
 
 func drawCornerMarks(s sudoku, x, y int, font rl.Font) {

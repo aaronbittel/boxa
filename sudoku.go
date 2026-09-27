@@ -12,6 +12,7 @@ type sudoku [cellCount][cellCount]cellState
 type cellState struct {
 	value       int
 	selected    bool
+	given       bool
 	cornerMarks [cellCount]bool
 	centerMarks [cellCount]bool
 }
@@ -140,6 +141,7 @@ func initFilledSudoku() sudoku {
 		for x := range cellCount {
 			if rand.IntN(100) < 20 {
 				s[y][x].value = rand.IntN(cellCount) + 1
+				s[y][x].given = true
 			}
 		}
 	}
