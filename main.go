@@ -115,6 +115,8 @@ func handleEvent(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
 			handleNumberKey(event, sudoku)
 		case KeyDelete:
 			handleDeleteKey(event, sudoku)
+		case KeyArrowUp, KeyArrowDown, KeyArrowRight, KeyArrowLeft:
+			handleArrowKey(event, sudoku)
 		}
 	}
 }
@@ -176,6 +178,63 @@ func handleDeleteKey(event Event, sudoku *sudoku) {
 			cell.clearNumber()
 		})
 	}
+}
+
+func handleArrowKey(event Event, sudoku *sudoku) {
+	var (
+		selectedCount = 0
+		selectedCell  Cell
+	)
+	for y := range cellCount {
+		for x := range cellCount {
+			if sudoku.at(x, y).selected {
+				selectedCount++
+				if selectedCount > 1 {
+					return
+				}
+				selectedCell = Cell{
+					Row: y,
+					Col: x,
+				}
+			}
+		}
+	}
+	if selectedCount == 0 {
+		return
+	}
+
+	sudoku.deselectCell(selectedCell.Col, selectedCell.Row)
+
+	switch event.Key {
+	case KeyArrowUp:
+		if selectedCell.Row == 0 {
+			selectedCell.Row = cellCount - 1
+		} else {
+			selectedCell.Row -= 1
+		}
+	case KeyArrowDown:
+		if selectedCell.Row == cellCount-1 {
+			selectedCell.Row = 0
+		} else {
+			selectedCell.Row += 1
+		}
+	case KeyArrowLeft:
+		if selectedCell.Col == 0 {
+			selectedCell.Col = cellCount - 1
+		} else {
+			selectedCell.Col -= 1
+		}
+	case KeyArrowRight:
+		if selectedCell.Col == cellCount-1 {
+			selectedCell.Col = 0
+		} else {
+			selectedCell.Col += 1
+		}
+	default:
+		panic("illegal key, expected arrow key")
+	}
+
+	sudoku.selectCell(selectedCell.Col, selectedCell.Row)
 }
 
 func handleNumberKey(event Event, sudoku *sudoku) {

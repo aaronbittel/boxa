@@ -47,6 +47,10 @@ const (
 	KeyEight
 	KeyNine
 	KeyDelete
+	KeyArrowUp
+	KeyArrowDown
+	KeyArrowRight
+	KeyArrowLeft
 )
 
 func (k Key) Value() int {
@@ -54,6 +58,41 @@ func (k Key) Value() int {
 		panic("key has no Sudoku value")
 	}
 	return int(k)
+}
+
+func (k Key) String() string {
+	switch k {
+	case KeyOne:
+		return "KeyOne"
+	case KeyTwo:
+		return "KeyTwo"
+	case KeyThree:
+		return "KeyThree"
+	case KeyFour:
+		return "KeyFour"
+	case KeyFive:
+		return "KeyFive"
+	case KeySix:
+		return "KeySix"
+	case KeySeven:
+		return "KeySeven"
+	case KeyEight:
+		return "KeyEight"
+	case KeyNine:
+		return "KeyNine"
+	case KeyDelete:
+		return "KeyDelete"
+	case KeyArrowUp:
+		return "KeyArrowUp"
+	case KeyArrowDown:
+		return "KeyArrowDown"
+	case KeyArrowRight:
+		return "KeyArrowRight"
+	case KeyArrowLeft:
+		return "KeyArrowLeft"
+	default:
+		panic("new key was added")
+	}
 }
 
 const doubleClickTimeThreshold = 500 * time.Millisecond
@@ -222,6 +261,14 @@ func (*Input) keyEvent() (Event, bool) {
 		keyEvent.Key = KeyNine
 	case rl.IsKeyPressed(rl.KeyBackspace), rl.IsKeyPressed(rl.KeyDelete):
 		keyEvent.Key = KeyDelete
+	case rl.IsKeyPressed(rl.KeyUp):
+		keyEvent.Key = KeyArrowUp
+	case rl.IsKeyPressed(rl.KeyDown):
+		keyEvent.Key = KeyArrowDown
+	case rl.IsKeyPressed(rl.KeyRight):
+		keyEvent.Key = KeyArrowRight
+	case rl.IsKeyPressed(rl.KeyLeft):
+		keyEvent.Key = KeyArrowLeft
 	default:
 		ok = false
 	}
