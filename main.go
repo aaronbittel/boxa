@@ -33,9 +33,11 @@ const (
 )
 
 var (
-	highlightColor      = rl.NewColor(0x4C, 0xA4, 0xFF, 0xFF)
-	conflictCellColor   = rl.NewColor(0xD9, 0x9C, 0x9C, 0xFF)
-	conflictBorderColor = rl.NewColor(0x80, 0x6F, 0x9C, 0xFF)
+	defaultColor            = rl.Blue
+	highlightColor          = rl.NewColor(0x4C, 0xA4, 0xFF, 0xFF)
+	conflictCellColor       = rl.NewColor(0xD9, 0x9C, 0x9C, 0xFF)
+	conflictPencilMarkColor = rl.NewColor(0xBB, 0x4E, 0x4E, 0xFF)
+	conflictBorderColor     = rl.NewColor(0x80, 0x6F, 0x9C, 0xFF)
 )
 
 var debug = false
@@ -101,8 +103,8 @@ func main() {
 		rl.ClearBackground(rl.RayWhite)
 
 		drawConflictingCells(sudoku)
-		drawSudoku(sudoku, font)
 		drawSelectedBorders(sudoku)
+		drawSudoku(sudoku, font)
 		drawGrid()
 
 		if debug {
@@ -152,9 +154,9 @@ func handleDoubleClick(event Event, sudoku *sudoku) {
 		case !candidate.isEmpty():
 			return candidate.value == clickedCell.value
 		case clickedCell.hasCenterMarks():
-			return candidate.containsCenterMarksOf(clickedCell)
+			return candidate.containsCenterMarksOf(*clickedCell)
 		case clickedCell.hasCornerMarks():
-			return candidate.containsCornerMarksOf(clickedCell)
+			return candidate.containsCornerMarksOf(*clickedCell)
 		}
 		return false
 	})
@@ -265,13 +267,13 @@ func handleNumberKey(event Event, sudoku *sudoku) {
 	switch {
 	case event.Modifiers.Shift:
 		sudoku.forEachSelectedCell(func(cell *cellState) {
-			if sudoku.isEmpty(event.Cell.Col, event.Cell.Row) {
+			if sudoku.at(event.Cell.Col, event.Cell.Row).isEmpty() {
 				cell.toggleCornerMark(index)
 			}
 		})
 	case event.Modifiers.Ctrl:
 		sudoku.forEachSelectedCell(func(cell *cellState) {
-			if sudoku.isEmpty(event.Cell.Col, event.Cell.Row) {
+			if sudoku.at(event.Cell.Col, event.Cell.Row).isEmpty() {
 				cell.toggleCenterMark(index)
 			}
 		})
@@ -313,7 +315,7 @@ func drawGrid() {
 func drawSudoku(s sudoku, font rl.Font) {
 	for y := range cellCount {
 		for x := range cellCount {
-			if !s.isEmpty(x, y) {
+			if !s.at(x, y).isEmpty() {
 				drawCellNumber(s, x, y, font)
 			} else {
 				drawCornerMarks(s, x, y, font)
@@ -326,14 +328,14 @@ func drawCellNumber(s sudoku, x, y int, font rl.Font) {
 	cellX := float32(x * cellSize)
 	cellY := float32(y * cellSize)
 
-	text := strconv.Itoa(s[y][x].value)
+	text := strconv.Itoa(s.at(x, y).value)
 	textWidth := rl.MeasureTextEx(font, text, cellNumberFontSize, 0.0)
 	pos := rl.Vector2{
 		X: cellX + (cellSize-textWidth.X)/2,
 		Y: cellY + 14.0,
 	}
 
-	color := rl.Blue
+	color := defaultColor
 	if s.at(x, y).given {
 		color = rl.Black
 	}
@@ -341,13 +343,17 @@ func drawCellNumber(s sudoku, x, y int, font rl.Font) {
 }
 
 func drawCornerMarks(s sudoku, x, y int, font rl.Font) {
+	if !s.at(x, y).hasCornerMarks() {
+		return
+	}
+
 	cellX := float32(x * cellSize)
 	cellY := float32(y * cellSize)
 	cornerSize := float32((cellSize - 2*highlightThickness)) / 3
 	i := 0
-	for j, c := range s[y][x].cornerMarks {
+	for j, marked := range s.at(x, y).cornerMarks {
 		num := j + 1
-		if c {
+		if marked {
 			text := strconv.Itoa(num)
 			markSize := rl.MeasureTextEx(font, text, cornerSize, 0.0)
 
@@ -359,23 +365,28 @@ func drawCornerMarks(s sudoku, x, y int, font rl.Font) {
 				X: markX,
 				Y: markY,
 			}
-			rl.DrawTextEx(font, text, pos, cornerSize, 0.0, rl.Blue)
+
+			color := defaultColor
+			if s.hasConflictFor(x, y, num) {
+				color = conflictPencilMarkColor
+			}
+			rl.DrawTextEx(font, text, pos, cornerSize, 0.0, color)
 			i++
 		}
 	}
 }
 
 func drawCenterMarks(s sudoku, x, y int, font rl.Font) {
+	if !s.at(x, y).hasCenterMarks() {
+		return
+	}
+
 	var sb strings.Builder
 
-	for i, marked := range s[y][x].centerMarks {
+	for i, marked := range s.at(x, y).centerMarks {
 		if marked {
 			fmt.Fprintf(&sb, "%d", i+1)
 		}
-	}
-
-	if sb.Len() == 0 {
-		return
 	}
 
 	text := sb.String()
@@ -393,18 +404,30 @@ func drawCenterMarks(s sudoku, x, y int, font rl.Font) {
 		Y: float32(y*cellSize) + float32((cellSize-fontSize))/2 + 2,
 	}
 
-	rl.DrawTextEx(font, text, pos, fontSize, 0.0, rl.Blue)
+	for i, marked := range s.at(x, y).centerMarks {
+		if !marked {
+			continue
+		}
+
+		num := i + 1
+		color := defaultColor
+		if s.hasConflictFor(x, y, num) {
+			color = conflictPencilMarkColor
+		}
+		rl.DrawTextEx(font, strconv.Itoa(num), pos, fontSize, 0.0, color)
+		pos.X += textSize.X / float32(len(text))
+	}
 }
 
 func drawSelectedBorders(s sudoku) {
 	for y := range cellCount {
 		for x := range cellCount {
-			if !s[y][x].selected {
+			if !s.at(x, y).selected {
 				continue
 			}
 
 			color := highlightColor
-			if s.hasConflict(x, y) {
+			if s.hasCellConflict(x, y) {
 				color = conflictBorderColor
 			}
 
@@ -413,36 +436,36 @@ func drawSelectedBorders(s sudoku) {
 			cellX := int32(x * cellSize)
 			cellY := int32(y * cellSize)
 
-			if y == 0 || !s[y-1][x].selected {
+			if y == 0 || !s.at(x, y-1).selected {
 				rl.DrawRectangle(cellX, cellY, cellSize, highlightThickness, color)
 				edgesCount++
 			}
-			if y == 8 || !s[y+1][x].selected {
+			if y == 8 || !s.at(x, y+1).selected {
 				rl.DrawRectangle(cellX, cellY+cellSize-highlightThickness, cellSize, highlightThickness, color)
 				edgesCount++
 			}
-			if x == 0 || !s[y][x-1].selected {
+			if x == 0 || !s.at(x-1, y).selected {
 				rl.DrawRectangle(cellX, cellY, highlightThickness, cellSize, color)
 				edgesCount++
 			}
-			if x == 8 || !s[y][x+1].selected {
+			if x == 8 || !s.at(x+1, y).selected {
 				rl.DrawRectangle(cellX+cellSize-highlightThickness, cellY, highlightThickness, cellSize, color)
 				edgesCount++
 			}
 
-			if y > 0 && x < cellCount-1 && s[y-1][x].selected && s[y][x+1].selected && !s[y-1][x+1].selected {
+			if y > 0 && x < cellCount-1 && s.at(x, y-1).selected && s.at(x+1, y).selected && !s.at(x+1, y-1).selected {
 				center := rl.Vector2{X: float32(cellX + cellSize), Y: float32(cellY)}
 				rl.DrawCircleSector(center, highlightThickness, 180.0, 90.0, 16, color)
 			}
-			if y < cellCount-1 && x < cellCount-1 && s[y][x+1].selected && s[y+1][x].selected && !s[y+1][x+1].selected {
+			if y < cellCount-1 && x < cellCount-1 && s.at(x+1, y).selected && s.at(x, y+1).selected && !s.at(x+1, y+1).selected {
 				center := rl.Vector2{X: float32(cellX + cellSize), Y: float32(cellY + cellSize)}
 				rl.DrawCircleSector(center, highlightThickness, 180.0, 270.0, 16, color)
 			}
-			if y < cellCount-1 && x > 0 && s[y+1][x].selected && s[y][x-1].selected && !s[y+1][x-1].selected {
+			if y < cellCount-1 && x > 0 && s.at(x, y+1).selected && s.at(x-1, y).selected && !s.at(x-1, y+1).selected {
 				center := rl.Vector2{X: float32(cellX), Y: float32(cellY + cellSize)}
 				rl.DrawCircleSector(center, highlightThickness, 270.0, 360.0, 16, color)
 			}
-			if y > 0 && x > 0 && s[y][x-1].selected && s[y-1][x].selected && !s[y-1][x-1].selected {
+			if y > 0 && x > 0 && s.at(x-1, y).selected && s.at(x, y-1).selected && !s.at(x-1, y-1).selected {
 				center := rl.Vector2{X: float32(cellX), Y: float32(cellY)}
 				rl.DrawCircleSector(center, highlightThickness, 0.0, 90.0, 16, color)
 			}
@@ -457,13 +480,13 @@ func drawSelectedCell(y, x int) {
 		Width:  cellSize,
 		Height: cellSize,
 	}
-	rl.DrawRectangleLinesEx(rec, borderThickness, rl.Blue)
+	rl.DrawRectangleLinesEx(rec, borderThickness, defaultColor)
 }
 
 func drawConflictingCells(s sudoku) {
 	for y := range cellCount {
 		for x := range cellCount {
-			if s.hasConflict(x, y) {
+			if s.hasCellConflict(x, y) {
 				cellX := int32(x * cellSize)
 				cellY := int32(y * cellSize)
 				rl.DrawRectangle(cellX, cellY, cellSize, cellSize, conflictCellColor)

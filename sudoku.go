@@ -75,13 +75,24 @@ func (c *cellState) containsCornerMarksOf(other cellState) bool {
 	return true
 }
 
-func (s *sudoku) hasConflict(x, y int) bool {
-	if s.isEmpty(x, y) {
+func (s *sudoku) hasConflictFor(x, y, value int) bool {
+	return s.hasColConflict(x, y, value) ||
+		s.hasRowConflict(x, y, value) ||
+		s.hasBoxConflict(x, y, value)
+}
+
+func (s *sudoku) hasCellConflict(x, y int) bool {
+	if s.at(x, y).isEmpty() {
 		return false
 	}
+	return s.hasConflictFor(x, y, s.at(x, y).value)
+}
 
-	value := s.at(x, y).value
+func (s *sudoku) hasCenterMarks(x, y int) bool {
+	return s.at(x, y).hasCenterMarks()
+}
 
+func (s *sudoku) hasRowConflict(x, y, value int) bool {
 	for xo := range cellCount {
 		if x == xo {
 			continue
@@ -90,7 +101,10 @@ func (s *sudoku) hasConflict(x, y int) bool {
 			return true
 		}
 	}
+	return false
+}
 
+func (s *sudoku) hasColConflict(x, y, value int) bool {
 	for yo := range cellCount {
 		if y == yo {
 			continue
@@ -99,7 +113,10 @@ func (s *sudoku) hasConflict(x, y int) bool {
 			return true
 		}
 	}
+	return false
+}
 
+func (s *sudoku) hasBoxConflict(x, y, value int) bool {
 	boxX := (x / 3) * 3
 	boxY := (y / 3) * 3
 
@@ -115,7 +132,6 @@ func (s *sudoku) hasConflict(x, y int) bool {
 			}
 		}
 	}
-
 	return false
 }
 
@@ -135,11 +151,11 @@ func (s *sudoku) selectIf(predicate func(cell cellState) bool) {
 	}
 }
 
-func (s *sudoku) at(x, y int) cellState {
+func (s *sudoku) at(x, y int) *cellState {
 	if x < 0 || x >= cellCount || y < 0 || y >= cellCount {
 		panic("invalid position")
 	}
-	return s[y][x]
+	return &s[y][x]
 }
 
 func (s *sudoku) forEachSelectedCell(fn func(cell *cellState)) {
@@ -167,10 +183,6 @@ func (s *sudoku) deselectCell(x, y int) {
 
 func (s *sudoku) toggleSelection(x, y int) {
 	s[y][x].selected = !s[y][x].selected
-}
-
-func (s sudoku) isEmpty(x, y int) bool {
-	return s[y][x].isEmpty()
 }
 
 func (s *sudoku) unselectAllCells() {
