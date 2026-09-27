@@ -105,17 +105,30 @@ func (e Event) String() string {
 	}
 }
 
-func (i *Input) handle() []Event {
+func (i *Input) poll() []Event {
 	events := []Event{}
 
+	if mouseEvent, ok := i.mouseEvent(); ok {
+		events = append(events, mouseEvent)
+	}
+
+	if keyEvent, ok := i.keyEvent(); ok {
+		events = append(events, keyEvent)
+	}
+
+	return events
+}
+
+func (i *Input) mouseEvent() (Event, bool) {
 	mousePos := rl.GetMousePosition()
+	x, y := positionToCellIdx(mousePos)
+	currentCell := Cell{Row: y, Col: x}
+
 	modifiers := Modifiers{
 		Ctrl:  rl.IsKeyDown(rl.KeyLeftControl),
 		Shift: rl.IsKeyDown(rl.KeyLeftShift),
 	}
 
-	x, y := positionToCellIdx(mousePos)
-	currentCell := Cell{Row: y, Col: x}
 	now := time.Now()
 	defer func() {
 		i.mouse.lastCell = currentCell
@@ -129,18 +142,18 @@ func (i *Input) handle() []Event {
 		}
 		if i.mouse.isDoubleClick(currentCell) {
 			i.mouse.lastClickTime = time.Time{}
-			events = append(events, Event{
+			return Event{
 				Type:      EventMouseDoubleClick,
 				Cell:      currentCell,
 				Modifiers: modifiers,
-			})
+			}, true
 		} else {
 			i.mouse.lastClickTime = now
-			events = append(events, Event{
+			return Event{
 				Type:      EventMousePressed,
 				Cell:      currentCell,
 				Modifiers: modifiers,
-			})
+			}, true
 		}
 	case rl.IsMouseButtonDown(rl.MouseButtonLeft):
 		if !i.mouse.Active {
@@ -149,32 +162,43 @@ func (i *Input) handle() []Event {
 		if _, visited := i.mouse.VisitedCells[currentCell]; visited {
 			break
 		}
-		if !isInsideSelectionArea(mousePos, x, y) {
+		if !isInsideSelectionArea(rl.GetMousePosition(), x, y) {
 			break
 		}
 		i.mouse.VisitedCells[currentCell] = struct{}{}
-		events = append(events, Event{
+		return Event{
 			Type:      EventMouseCellEntered,
 			Cell:      currentCell,
 			Modifiers: modifiers,
-		})
+		}, true
 	case rl.IsMouseButtonReleased(rl.MouseButtonLeft):
 		if !i.mouse.Active {
 			panic("invalid input state, must be active")
 		}
 		i.mouse.Active = false
-		events = append(events, Event{
+		return Event{
 			Type:      EventMouseReleased,
 			Cell:      currentCell,
 			Modifiers: modifiers,
-		})
+		}, true
 	}
 
-	pressed := true
+	return Event{}, false
+}
+
+func (*Input) keyEvent() (Event, bool) {
+	mousePos := rl.GetMousePosition()
+	x, y := positionToCellIdx(mousePos)
+	currentCell := Cell{Row: y, Col: x}
+
+	ok := true
 	keyEvent := Event{
-		Type:      EventKeyPressed,
-		Cell:      currentCell,
-		Modifiers: modifiers,
+		Type: EventKeyPressed,
+		Cell: currentCell,
+		Modifiers: Modifiers{
+			Ctrl:  rl.IsKeyDown(rl.KeyLeftControl),
+			Shift: rl.IsKeyDown(rl.KeyLeftShift),
+		},
 	}
 
 	switch {
@@ -199,12 +223,7 @@ func (i *Input) handle() []Event {
 	case rl.IsKeyPressed(rl.KeyBackspace), rl.IsKeyPressed(rl.KeyDelete):
 		keyEvent.Key = KeyDelete
 	default:
-		pressed = false
+		ok = false
 	}
-
-	if pressed {
-		events = append(events, keyEvent)
-	}
-
-	return events
+	return keyEvent, ok
 }

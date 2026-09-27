@@ -82,7 +82,7 @@ func main() {
 	rl.SetTargetFPS(60)
 
 	for !rl.WindowShouldClose() {
-		events := input.handle()
+		events := input.poll()
 
 		for _, event := range events {
 			handleEvent(event, &sudoku, &selectionMode)
