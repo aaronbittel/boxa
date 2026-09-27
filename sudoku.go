@@ -40,7 +40,9 @@ func (c *cellState) clearCenterMarks() {
 }
 
 func (c *cellState) clearNumber() {
-	c.value = emptyCell
+	if !c.given {
+		c.value = emptyCell
+	}
 }
 
 func (c *cellState) isEmpty() bool {
