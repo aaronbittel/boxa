@@ -33,6 +33,7 @@ const (
 )
 
 var highlightColor = rl.NewColor(0x4C, 0xA4, 0xFF, 0xFF)
+var debug = false
 
 var pencilMarkCornerOffsets = [cellCount]rl.Vector2{
 	{X: 0, Y: 0},
@@ -85,6 +86,9 @@ func main() {
 		events := input.poll()
 
 		for _, event := range events {
+			if debug {
+				fmt.Println("event", event, "selectionMode", selectionMode)
+			}
 			handleEvent(event, &sudoku, &selectionMode)
 		}
 
@@ -94,6 +98,10 @@ func main() {
 		drawSelectedBorders(sudoku)
 		drawSudoku(sudoku, font)
 		drawGrid()
+
+		if debug {
+			drawDebug()
+		}
 
 		rl.EndDrawing()
 	}
@@ -117,6 +125,10 @@ func handleEvent(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
 			handleDeleteKey(event, sudoku)
 		case KeyArrowUp, KeyArrowDown, KeyArrowRight, KeyArrowLeft:
 			handleArrowKey(event, sudoku)
+		case KeyD: // Debug
+			if event.Modifiers.Ctrl {
+				debug = !debug
+			}
 		}
 	}
 }
@@ -431,6 +443,10 @@ func drawSelectedCell(y, x int) {
 		Height: cellSize,
 	}
 	rl.DrawRectangleLinesEx(rec, borderThickness, rl.Blue)
+}
+
+func drawDebug() {
+	rl.DrawText("debug", 10, 10, 32, rl.LightGray)
 }
 
 func positionToCellIdx(pos rl.Vector2) (x, y int) {

@@ -46,11 +46,15 @@ const (
 	KeySeven
 	KeyEight
 	KeyNine
+
 	KeyDelete
+
 	KeyArrowUp
 	KeyArrowDown
 	KeyArrowRight
 	KeyArrowLeft
+
+	KeyD // DebugKey
 )
 
 func (k Key) Value() int {
@@ -90,6 +94,8 @@ func (k Key) String() string {
 		return "KeyArrowRight"
 	case KeyArrowLeft:
 		return "KeyArrowLeft"
+	case KeyD:
+		return "KeyD"
 	default:
 		panic("new key was added")
 	}
@@ -274,6 +280,8 @@ func (*Input) keyEvent() (Event, bool) {
 		keyEvent.Key = KeyArrowRight
 	case rl.IsKeyPressed(rl.KeyLeft):
 		keyEvent.Key = KeyArrowLeft
+	case rl.IsKeyPressed(rl.KeyD):
+		keyEvent.Key = KeyD
 	default:
 		ok = false
 	}
