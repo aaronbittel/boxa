@@ -169,9 +169,6 @@ func (i *Input) mouseEvent() (Event, bool) {
 	}
 
 	now := time.Now()
-	defer func() {
-		i.mouse.lastCell = currentCell
-	}()
 
 	switch {
 	case rl.IsMouseButtonPressed(rl.MouseButtonLeft):
@@ -188,6 +185,7 @@ func (i *Input) mouseEvent() (Event, bool) {
 			}, true
 		} else {
 			i.mouse.lastClickTime = now
+			i.mouse.lastCell = currentCell
 			return Event{
 				Type:      EventMousePressed,
 				Cell:      currentCell,
