@@ -75,6 +75,50 @@ func (c *cellState) containsCornerMarksOf(other cellState) bool {
 	return true
 }
 
+func (s *sudoku) hasConflict(x, y int) bool {
+	if s.isEmpty(x, y) {
+		return false
+	}
+
+	value := s.at(x, y).value
+
+	for xo := range cellCount {
+		if x == xo {
+			continue
+		}
+		if s.at(xo, y).value == value {
+			return true
+		}
+	}
+
+	for yo := range cellCount {
+		if y == yo {
+			continue
+		}
+		if s.at(x, yo).value == value {
+			return true
+		}
+	}
+
+	boxX := (x / 3) * 3
+	boxY := (y / 3) * 3
+
+	for dx := range 3 {
+		for dy := range 3 {
+			xo := boxX + dx
+			yo := boxY + dy
+			if xo == x && yo == y {
+				continue
+			}
+			if s.at(xo, yo).value == value {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func (s *sudoku) toggleCornerMark(num int) {
 	s.forEachSelectedCell(func(cell *cellState) {
 		cell.cornerMarks[num] = !cell.cornerMarks[num]
