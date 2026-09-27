@@ -123,14 +123,19 @@ type Input struct {
 }
 
 type MouseState struct {
-	Active        bool
-	VisitedCells  map[Cell]struct{}
-	lastCell      Cell
-	lastClickTime time.Time
+	Active       bool
+	VisitedCells map[Cell]struct{}
+	LastClick    struct {
+		Active bool
+		Cell   Cell
+		When   time.Time
+	}
 }
 
 func (ms MouseState) isDoubleClick(currentCell Cell) bool {
-	return currentCell == ms.lastCell && time.Since(ms.lastClickTime) < doubleClickTimeThreshold
+	return ms.LastClick.Active &&
+		currentCell == ms.LastClick.Cell &&
+		time.Since(ms.LastClick.When) < doubleClickTimeThreshold
 }
 
 func (e Event) String() string {
@@ -177,15 +182,16 @@ func (i *Input) mouseEvent() (Event, bool) {
 			currentCell: {},
 		}
 		if i.mouse.isDoubleClick(currentCell) {
-			i.mouse.lastClickTime = time.Time{}
+			i.mouse.LastClick.Active = false
 			return Event{
 				Type:      EventMouseDoubleClick,
 				Cell:      currentCell,
 				Modifiers: modifiers,
 			}, true
 		} else {
-			i.mouse.lastClickTime = now
-			i.mouse.lastCell = currentCell
+			i.mouse.LastClick.Active = true
+			i.mouse.LastClick.Cell = currentCell
+			i.mouse.LastClick.When = now
 			return Event{
 				Type:      EventMousePressed,
 				Cell:      currentCell,
@@ -193,6 +199,7 @@ func (i *Input) mouseEvent() (Event, bool) {
 			}, true
 		}
 	case rl.IsMouseButtonDown(rl.MouseButtonLeft):
+		i.mouse.LastClick.Active = false
 		if !i.mouse.Active {
 			panic("invalid input state, must be active")
 		}
