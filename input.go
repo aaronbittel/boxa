@@ -205,7 +205,6 @@ func (i *Input) mouseEvent() (Event, bool) {
 			}, true
 		}
 	case rl.IsMouseButtonDown(rl.MouseButtonLeft):
-		i.mouse.LastClick.Active = false
 		if !i.mouse.Active {
 			panic("invalid input state, must be active")
 		}
@@ -215,6 +214,7 @@ func (i *Input) mouseEvent() (Event, bool) {
 		if !isInsideSelectionArea(rl.GetMousePosition(), x, y) {
 			break
 		}
+		i.mouse.LastClick.Active = false
 		i.mouse.VisitedCells[currentCell] = struct{}{}
 		return Event{
 			Type:      EventMouseCellEntered,
