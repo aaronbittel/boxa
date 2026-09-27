@@ -164,13 +164,17 @@ func handleDragging(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
 }
 
 func handleSingleClick(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
+	if !event.Modifiers.Ctrl {
+		sudoku.unselectAllCells()
+		sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
+		*selectionMode = SelectionSelect
+		return
+	}
+
 	if sudoku.isSelected(event.Cell.Col, event.Cell.Row) {
 		*selectionMode = SelectionDeselect
 	} else {
 		*selectionMode = SelectionSelect
-	}
-	if !event.Modifiers.Ctrl {
-		sudoku.unselectAllCells()
 	}
 	sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
 }
@@ -468,4 +472,17 @@ func isInsideSelectionArea(pos rl.Vector2, x, y int) bool {
 	}
 
 	return rl.CheckCollisionPointRec(pos, r1) || rl.CheckCollisionPointRec(pos, r2)
+}
+
+func (s SelectionMode) String() string {
+	switch s {
+	case SelectionUnset:
+		return "SelectionUnset"
+	case SelectionSelect:
+		return "SelectionSelect"
+	case SelectionDeselect:
+		return "SelectionDeselect"
+	default:
+		panic("new SelectionMode variant was added")
+	}
 }
