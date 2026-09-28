@@ -6,6 +6,20 @@ import (
 
 type sudoku [cellCount][cellCount]cellState
 
+func (s *sudoku) isSolved() bool {
+	for y := range cellCount {
+		for x := range cellCount {
+			if s.at(x, y).isEmpty() {
+				return false
+			}
+			if s.hasCellConflict(x, y) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (s *sudoku) hasConflictFor(x, y, value int) bool {
 	return s.hasNumberInCol(x, y, value) ||
 		s.hasNumberInRow(x, y, value) ||

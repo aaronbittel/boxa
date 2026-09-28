@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aaronbittel/boxa/fetch"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -22,6 +23,7 @@ const (
 	selectionMargin    = 15
 
 	cellNumberFontSize float32 = cellSize * 0.7
+	textFontSize       float32 = 64.0
 )
 
 type SelectionMode int
@@ -81,22 +83,33 @@ func main() {
 	rl.InitWindow(width, height, "Boxa")
 	defer rl.CloseWindow()
 
-	font := rl.LoadFontEx("./fonts/DejaVuSans.ttf", 64, nil, 0)
+	font := rl.LoadFontEx("./fonts/DejaVuSans.ttf", int32(textFontSize), nil, 0)
 	defer rl.UnloadFont(font)
 
 	var input Input
+
+	sudokuIsSolved := false
+	start := time.Now()
+	var duration time.Duration
 	selectionMode := SelectionUnset
 
 	rl.SetTargetFPS(60)
 
 	for !rl.WindowShouldClose() {
-		events := input.poll()
+		if !sudokuIsSolved {
+			events := input.poll()
 
-		for _, event := range events {
-			if debug {
-				fmt.Println("event", event, "selectionMode", selectionMode)
+			for _, event := range events {
+				if debug {
+					fmt.Println("event", event, "selectionMode", selectionMode)
+				}
+				handleEvent(event, &sudoku, &selectionMode)
+				if sudoku.isSolved() {
+					sudokuIsSolved = true
+					duration = time.Since(start)
+					break
+				}
 			}
-			handleEvent(event, &sudoku, &selectionMode)
 		}
 
 		rl.BeginDrawing()
@@ -105,7 +118,10 @@ func main() {
 		drawConflictingCells(sudoku)
 		drawSelectedBorders(sudoku)
 		drawSudoku(sudoku, font)
-		drawGrid()
+		drawGrid(sudokuIsSolved)
+		if sudokuIsSolved {
+			drawSudokuSolvedScreen(duration, font)
+		}
 
 		if debug {
 			drawDebug()
@@ -284,9 +300,13 @@ func handleNumberKey(event Event, sudoku *sudoku) {
 	}
 }
 
-func drawGrid() {
+func drawGrid(solved bool) {
 	border := rl.Rectangle{Width: width, Height: height}
-	rl.DrawRectangleLinesEx(border, borderThickness, rl.Black)
+	borderColor := rl.Black
+	if solved {
+		borderColor = rl.Green
+	}
+	rl.DrawRectangleLinesEx(border, borderThickness, borderColor)
 
 	for y := 1; y < cellCount; y++ {
 		start := rl.Vector2{X: 0, Y: float32(y * cellSize)}
@@ -310,6 +330,39 @@ func drawGrid() {
 		rl.DrawLineEx(start, end, t, rl.Black)
 	}
 
+}
+
+func drawSudokuSolvedScreen(duration time.Duration, font rl.Font) {
+	const (
+		spacing  = 2.0
+		bgWidth  = width * 0.5
+		bgHeight = height * 0.4
+	)
+
+	bg := rl.Rectangle{
+		X:      (width - bgWidth) / 2,
+		Y:      (height - bgHeight) / 2,
+		Width:  bgWidth,
+		Height: bgHeight,
+	}
+
+	congratsText := "Congrats!"
+	congratsTextSize := rl.MeasureTextEx(font, congratsText, textFontSize, spacing)
+	congratsTextPos := rl.Vector2{
+		X: bg.X + (bg.Width-congratsTextSize.X)/2,
+		Y: bg.Y + bg.Height*0.2,
+	}
+
+	timeText := fmt.Sprintf("Time: %s", formatDuration(duration))
+	timeTextSize := rl.MeasureTextEx(font, timeText, textFontSize, spacing)
+	timeTextPos := rl.Vector2{
+		X: bg.X + (bg.Width-timeTextSize.X)/2,
+		Y: bg.Y + bg.Height*0.5,
+	}
+
+	rl.DrawRectangleRounded(bg, 0.4, 32, rl.NewColor(0xE8, 0xE6, 0xE1, 0xFF))
+	rl.DrawTextEx(font, congratsText, congratsTextPos, textFontSize, spacing, rl.Green)
+	rl.DrawTextEx(font, timeText, timeTextPos, textFontSize, spacing, rl.Green)
 }
 
 func drawSudoku(s sudoku, font rl.Font) {
@@ -531,4 +584,12 @@ func (s SelectionMode) String() string {
 	default:
 		panic("new SelectionMode variant was added")
 	}
+}
+
+func formatDuration(d time.Duration) string {
+	totalSeconds := int(d / time.Second)
+	minutes := totalSeconds / 60
+	seconds := totalSeconds % 60
+
+	return fmt.Sprintf("%02d:%02d", minutes, seconds)
 }
