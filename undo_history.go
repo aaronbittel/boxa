@@ -15,12 +15,13 @@ type undoHistory struct {
 }
 
 func (u *undoHistory) undo(s *sudoku) {
+	s.unselectAllCells()
+
 	if !u.canUndo() {
 		return
 	}
 
 	u.cursor--
-	s.unselectAllCells()
 
 	for cell, change := range u.entries[u.cursor] {
 		change.before.selected = true
