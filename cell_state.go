@@ -1,6 +1,10 @@
 package main
 
-import "slices"
+import (
+	"cmp"
+	"image/color"
+	"slices"
+)
 
 const emptyCell = 0
 
@@ -10,6 +14,7 @@ type cellState struct {
 	given       bool
 	cornerMarks [cellCount]bool
 	centerMarks [cellCount]bool
+	colors      []color.RGBA
 }
 
 func (c *cellState) toggleCornerMark(index int) {
@@ -24,6 +29,25 @@ func (c *cellState) toggleCenterMark(index int) {
 		panic("invalid center index")
 	}
 	c.centerMarks[index] = !c.centerMarks[index]
+}
+
+func (c *cellState) toggleColor(color color.RGBA) {
+	i := slices.Index(c.colors, color)
+	if i == -1 {
+		c.colors = append(c.colors, color)
+		c.sortColors()
+	} else {
+		c.colors = slices.Delete(c.colors, i, i+1)
+	}
+}
+
+func (c *cellState) sortColors() {
+	slices.SortFunc(c.colors, func(a, b color.RGBA) int {
+		return cmp.Compare(
+			slices.Index(regionColors[:], a),
+			slices.Index(regionColors[:], b),
+		)
+	})
 }
 
 func (c *cellState) clearCornerMarks() {

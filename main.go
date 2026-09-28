@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image/color"
 	"log"
 	"os"
 	"strconv"
@@ -18,7 +19,7 @@ const (
 	width     = cellSize * cellCount
 	height    = cellSize * cellCount
 
-	borderThickness    = 4
+	borderThickness    = 5
 	highlightThickness = 9
 	selectionMargin    = 15
 
@@ -54,6 +55,16 @@ var pencilMarkCornerOffsets = [cellCount]rl.Vector2{
 	{X: 0, Y: 1},
 	{X: 2, Y: 1},
 	{X: 1, Y: 1},
+}
+
+var regionColors = [6]color.RGBA{
+	rl.NewColor(0xD0, 0xE0, 0xB7, 0xFF),
+	rl.NewColor(0xF1, 0xB0, 0xF7, 0xFF),
+	rl.NewColor(0xEF, 0xC0, 0x84, 0xFF),
+	rl.NewColor(0xF9, 0x89, 0x87, 0xFF),
+	rl.RayWhite,
+	// rl.NewColor(0xFD, 0xF3, 0x8C, 0xFF),
+	// rl.NewColor(0x8B, 0xC2, 0xF9, 0xFF),
 }
 
 func main() {
@@ -116,10 +127,17 @@ func main() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
 
+		drawCellBackground(sudoku)
 		drawConflictingCells(sudoku)
 		drawSelectedBorders(sudoku)
 		drawSudoku(sudoku, font)
-		drawGrid(sudokuIsSolved)
+
+		borderColor := rl.Black
+		if sudokuIsSolved {
+			borderColor = rl.Green
+		}
+
+		drawGrid(borderColor)
 		if sudokuIsSolved {
 			drawSudokuSolvedScreen(duration, font)
 		}
@@ -217,6 +235,10 @@ func handleDeleteKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 	defer undoHistory.commit()
 
 	switch {
+	case event.Modifiers.Ctrl && event.Modifiers.Shift:
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			cell.colors = []color.RGBA{}
+		})
 	case event.Modifiers.Shift:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			before := *cell
@@ -303,6 +325,16 @@ func handleNumberKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 	defer undoHistory.commit()
 
 	switch {
+	case event.Modifiers.Ctrl && event.Modifiers.Shift:
+		switch value {
+		case 1, 2, 3, 4, 5:
+			selectedColor := regionColors[value-1]
+			sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+				before := *cell
+				cell.toggleColor(selectedColor)
+				undoHistory.record(pos, before, *cell)
+			})
+		}
 	case event.Modifiers.Shift:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			if cell.isEmpty() {
@@ -330,12 +362,8 @@ func handleNumberKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 	}
 }
 
-func drawGrid(solved bool) {
+func drawGrid(borderColor color.RGBA) {
 	border := rl.Rectangle{Width: width, Height: height}
-	borderColor := rl.Black
-	if solved {
-		borderColor = rl.Green
-	}
 	rl.DrawRectangleLinesEx(border, borderThickness, borderColor)
 
 	for y := 1; y < cellCount; y++ {
@@ -407,6 +435,233 @@ func drawSudoku(s sudoku, font rl.Font) {
 		}
 	}
 }
+
+type triangle [3]rl.Vector2
+type colorRegion []triangle
+type cellLayout []colorRegion
+
+var cellRegionsOffsets = map[int]cellLayout{
+	1: {
+		{
+			{
+				{X: 0, Y: 0},
+				{X: 1, Y: 0},
+				{X: 0, Y: 1},
+			},
+			{
+				{X: 1, Y: 0},
+				{X: 0, Y: 1},
+				{X: 1, Y: 1},
+			},
+		},
+	},
+	2: {
+		{
+			{
+				{X: 0, Y: 0},
+				{X: 0.7, Y: 0},
+				{X: 0, Y: 1},
+			},
+			{
+				{X: 0.7, Y: 0},
+				{X: 0, Y: 1},
+				{X: 0.3, Y: 1},
+			},
+		},
+		{
+			{
+				{X: 1, Y: 0},
+				{X: 0.3, Y: 1},
+				{X: 1, Y: 1},
+			},
+			{
+				{X: 0.3, Y: 1},
+				{X: 0.7, Y: 0},
+				{X: 1, Y: 0},
+			},
+		},
+	},
+	3: {
+		{
+			{
+				{X: 0.0, Y: 0},
+				{X: 0.75, Y: 0},
+				{X: 0, Y: 0.55},
+			},
+			{
+				{X: 0.75, Y: 0},
+				{X: 0, Y: 0.55},
+				{X: 0.5, Y: 0.5},
+			},
+		},
+		{
+			{
+				{X: 0, Y: 0.55},
+				{X: 0, Y: 1},
+				{X: 0.5, Y: 0.5},
+			},
+			{
+				{X: 0.5, Y: 0.5},
+				{X: 0, Y: 1},
+				{X: 0.85, Y: 1},
+			},
+		},
+		{
+			{
+				{X: 0.75, Y: 0},
+				{X: 1, Y: 0},
+				{X: 0.5, Y: 0.5},
+			},
+			{
+				{X: 0.5, Y: 0.5},
+				{X: 0.85, Y: 1},
+				{X: 1, Y: 1},
+			},
+			{
+				{X: 1, Y: 0},
+				{X: 1, Y: 1},
+				{X: 0.5, Y: 0.5},
+			},
+		},
+	},
+	4: {
+		{
+			{
+				{X: 0, Y: 0},
+				{X: 0, Y: 0.25},
+				{X: 0.5, Y: 0.5},
+			},
+			{
+				{X: 0, Y: 0},
+				{X: 0.5, Y: 0.5},
+				{X: 0.75, Y: 0},
+			},
+		},
+		{
+			{
+				{X: 0, Y: 0.25},
+				{X: 0.5, Y: 0.5},
+				{X: 0, Y: 1},
+			},
+			{
+				{X: 0.5, Y: 0.5},
+				{X: 0, Y: 1},
+				{X: 0.3, Y: 1},
+			},
+		},
+		{
+			{
+				{X: 0.3, Y: 1},
+				{X: 0.5, Y: 0.5},
+				{X: 1, Y: 1},
+			},
+			{
+				{X: 0.5, Y: 0.5},
+				{X: 1, Y: 1},
+				{X: 1, Y: 0.75},
+			},
+		},
+		{
+			{
+				{X: 0.75, Y: 0},
+				{X: 0.5, Y: 0.5},
+				{X: 1, Y: 0},
+			},
+			{
+				{X: 1, Y: 0},
+				{X: 0.5, Y: 0.5},
+				{X: 1, Y: 0.75},
+			},
+		},
+	},
+	5: {
+		{
+			{
+				{X: 0, Y: 0},
+				{X: 0.5, Y: 0.5},
+				{X: 0, Y: 0.75},
+			},
+		},
+		{
+			{
+				{X: 0, Y: 0.75},
+				{X: 0.5, Y: 0.5},
+				{X: 0, Y: 1},
+			},
+			{
+				{X: 0, Y: 1},
+				{X: 0.5, Y: 0.5},
+				{X: 0.65, Y: 1},
+			},
+		},
+		{
+			{
+				{X: 0.65, Y: 1},
+				{X: 0.5, Y: 0.5},
+				{X: 1, Y: 1},
+			},
+			{
+				{X: 1, Y: 1},
+				{X: 0.5, Y: 0.5},
+				{X: 1, Y: 0.55},
+			},
+		},
+		{
+			{
+				{X: 1, Y: 0.55},
+				{X: 0.5, Y: 0.5},
+				{X: 1, Y: 0},
+			},
+			{
+				{X: 1, Y: 0},
+				{X: 0.5, Y: 0.5},
+				{X: 0.7, Y: 0},
+			},
+		},
+		{
+			{
+				{X: 0, Y: 0},
+				{X: 0.5, Y: 0.5},
+				{X: 0.7, Y: 0},
+			},
+		},
+	},
+}
+
+func drawCellBackground(s sudoku) {
+	for y := range cellCount {
+		for x := range cellCount {
+			colors := s.at(x, y).colors
+			if len(colors) == 0 {
+				continue
+			}
+
+			layout, ok := cellRegionsOffsets[len(colors)]
+			if !ok {
+				continue
+			}
+
+			if len(layout) != len(colors) {
+				panic("region count must match color count")
+			}
+
+			cellPos := rl.Vector2{
+				X: float32(x * cellSize),
+				Y: float32(y * cellSize),
+			}
+
+			for i, region := range layout {
+				for _, triangle := range region {
+					v1 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[0], float32(cellSize)))
+					v2 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[1], float32(cellSize)))
+					v3 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[2], float32(cellSize)))
+					drawTriangleCCW(v1, v2, v3, colors[i])
+				}
+			}
+		}
+	}
+}
+
 func drawCellNumber(s sudoku, x, y int, font rl.Font) {
 	cellX := float32(x * cellSize)
 	cellY := float32(y * cellSize)
@@ -622,4 +877,15 @@ func formatDuration(d time.Duration) string {
 	seconds := totalSeconds % 60
 
 	return fmt.Sprintf("%02d:%02d", minutes, seconds)
+}
+
+func drawTriangleCCW(v1, v2, v3 rl.Vector2, color rl.Color) {
+	cross := (v2.X-v1.X)*(v3.Y-v1.Y) -
+		(v2.Y-v1.Y)*(v3.X-v1.X)
+
+	if cross > 0 {
+		rl.DrawTriangle(v1, v3, v2, color)
+	} else {
+		rl.DrawTriangle(v1, v2, v3, color)
+	}
 }
