@@ -54,6 +54,9 @@ const (
 	KeyArrowRight
 	KeyArrowLeft
 
+	KeyY
+	KeyZ
+
 	KeyD // DebugKey
 )
 
@@ -96,6 +99,10 @@ func (k Key) String() string {
 		return "KeyArrowLeft"
 	case KeyD:
 		return "KeyD"
+	case KeyY:
+		return "KeyY"
+	case KeyZ:
+		return "KeyZ"
 	default:
 		panic("new key was added")
 	}
@@ -282,8 +289,13 @@ func (*Input) keyEvent() (Event, bool) {
 		keyEvent.Key = KeyArrowLeft
 	case rl.IsKeyPressed(rl.KeyD):
 		keyEvent.Key = KeyD
+	case rl.IsKeyPressed(rl.KeyZ): // German keyboard: physical Z key is reported for Y
+		keyEvent.Key = KeyY
+	case rl.IsKeyPressed(rl.KeyY): // German keyboard: physical Y key is reported for Z
+		keyEvent.Key = KeyZ
 	default:
 		ok = false
 	}
+
 	return keyEvent, ok
 }

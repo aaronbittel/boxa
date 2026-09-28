@@ -20,6 +20,10 @@ func (s *sudoku) isSolved() bool {
 	return true
 }
 
+func (s *sudoku) set(pos Cell, state cellState) {
+	s[pos.Row][pos.Col] = state
+}
+
 func (s *sudoku) hasConflictFor(x, y, value int) bool {
 	return s.hasNumberInCol(x, y, value) ||
 		s.hasNumberInRow(x, y, value) ||
@@ -81,7 +85,7 @@ func (s *sudoku) hasNumberInBox(x, y, value int) bool {
 }
 
 func (s *sudoku) toggleCornerMark(num int) {
-	s.forEachSelectedCell(func(cell *cellState) {
+	s.forEachSelectedCell(func(_ Cell, cell *cellState) {
 		cell.cornerMarks[num] = !cell.cornerMarks[num]
 	})
 }
@@ -103,13 +107,17 @@ func (s *sudoku) at(x, y int) *cellState {
 	return &s[y][x]
 }
 
-func (s *sudoku) forEachSelectedCell(fn func(cell *cellState)) {
+func (s *sudoku) forEachSelectedCell(fn func(pos Cell, cell *cellState)) {
 	for y := range cellCount {
 		for x := range cellCount {
 			if !s[y][x].selected {
 				continue
 			}
-			fn(&s[y][x])
+			pos := Cell{
+				Row: y,
+				Col: x,
+			}
+			fn(pos, &s[y][x])
 		}
 	}
 }

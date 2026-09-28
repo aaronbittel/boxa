@@ -92,6 +92,7 @@ func main() {
 	start := time.Now()
 	var duration time.Duration
 	selectionMode := SelectionUnset
+	undoHistory := undoHistory{}
 
 	rl.SetTargetFPS(60)
 
@@ -103,7 +104,7 @@ func main() {
 				if debug {
 					fmt.Println("event", event, "selectionMode", selectionMode)
 				}
-				handleEvent(event, &sudoku, &selectionMode)
+				handleEvent(event, &sudoku, &selectionMode, &undoHistory)
 				if sudoku.isSolved() {
 					sudokuIsSolved = true
 					duration = time.Since(start)
@@ -131,7 +132,7 @@ func main() {
 	}
 }
 
-func handleEvent(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
+func handleEvent(event Event, sudoku *sudoku, selectionMode *SelectionMode, undoHistory *undoHistory) {
 	switch event.Type {
 	case EventMousePressed:
 		handleSingleClick(event, sudoku, selectionMode)
@@ -144,14 +145,22 @@ func handleEvent(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
 	case EventKeyPressed:
 		switch event.Key {
 		case KeyOne, KeyTwo, KeyThree, KeyFour, KeyFive, KeySix, KeySeven, KeyEight, KeyNine:
-			handleNumberKey(event, sudoku)
+			handleNumberKey(event, sudoku, undoHistory)
 		case KeyDelete:
-			handleDeleteKey(event, sudoku)
+			handleDeleteKey(event, sudoku, undoHistory)
 		case KeyArrowUp, KeyArrowDown, KeyArrowRight, KeyArrowLeft:
 			handleArrowKey(event, sudoku)
 		case KeyD: // Debug
 			if event.Modifiers.Ctrl {
 				debug = !debug
+			}
+		case KeyY:
+			if event.Modifiers.Ctrl {
+				undoHistory.redo(sudoku)
+			}
+		case KeyZ:
+			if event.Modifiers.Ctrl {
+				undoHistory.undo(sudoku)
 			}
 		}
 	}
@@ -203,19 +212,28 @@ func handleSingleClick(event Event, sudoku *sudoku, selectionMode *SelectionMode
 	sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
 }
 
-func handleDeleteKey(event Event, sudoku *sudoku) {
+func handleDeleteKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
+	undoHistory.begin()
+	defer undoHistory.commit()
+
 	switch {
 	case event.Modifiers.Shift:
-		sudoku.forEachSelectedCell(func(cell *cellState) {
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			before := *cell
 			cell.clearCornerMarks()
+			undoHistory.record(pos, before, *cell)
 		})
 	case event.Modifiers.Ctrl:
-		sudoku.forEachSelectedCell(func(cell *cellState) {
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			before := *cell
 			cell.clearCenterMarks()
+			undoHistory.record(pos, before, *cell)
 		})
 	default:
-		sudoku.forEachSelectedCell(func(cell *cellState) {
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			before := *cell
 			cell.clearNumber()
+			undoHistory.record(pos, before, *cell)
 		})
 	}
 }
@@ -277,25 +295,35 @@ func handleArrowKey(event Event, sudoku *sudoku) {
 	sudoku.selectCell(selectedCell.Col, selectedCell.Row)
 }
 
-func handleNumberKey(event Event, sudoku *sudoku) {
+func handleNumberKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 	value := event.Key.Value()
 	index := value - 1
+
+	undoHistory.begin()
+	defer undoHistory.commit()
+
 	switch {
 	case event.Modifiers.Shift:
-		sudoku.forEachSelectedCell(func(cell *cellState) {
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			if sudoku.at(event.Cell.Col, event.Cell.Row).isEmpty() {
+				before := *cell
 				cell.toggleCornerMark(index)
+				undoHistory.record(pos, before, *cell)
 			}
 		})
 	case event.Modifiers.Ctrl:
-		sudoku.forEachSelectedCell(func(cell *cellState) {
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			if sudoku.at(event.Cell.Col, event.Cell.Row).isEmpty() {
+				before := *cell
 				cell.toggleCenterMark(index)
+				undoHistory.record(pos, before, *cell)
 			}
 		})
 	default:
-		sudoku.forEachSelectedCell(func(cell *cellState) {
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			before := *cell
 			cell.value = value
+			undoHistory.record(pos, before, *cell)
 		})
 	}
 }
