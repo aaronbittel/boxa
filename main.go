@@ -305,7 +305,7 @@ func handleNumberKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 	switch {
 	case event.Modifiers.Shift:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			if sudoku.at(event.Cell.Col, event.Cell.Row).isEmpty() {
+			if cell.isEmpty() {
 				before := *cell
 				cell.toggleCornerMark(index)
 				undoHistory.record(pos, before, *cell)
@@ -313,7 +313,7 @@ func handleNumberKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 		})
 	case event.Modifiers.Ctrl:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			if sudoku.at(event.Cell.Col, event.Cell.Row).isEmpty() {
+			if cell.isEmpty() {
 				before := *cell
 				cell.toggleCenterMark(index)
 				undoHistory.record(pos, before, *cell)
@@ -321,9 +321,11 @@ func handleNumberKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 		})
 	default:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			before := *cell
-			cell.value = value
-			undoHistory.record(pos, before, *cell)
+			if !cell.given {
+				before := *cell
+				cell.value = value
+				undoHistory.record(pos, before, *cell)
+			}
 		})
 	}
 }
