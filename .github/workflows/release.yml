@@ -1,0 +1,53 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            goos: linux
+            ext: ""
+          - os: windows
+            arch: amd64
+            goos: windows
+            ext: ".exe"
+          - os: macos
+            arch: arm64
+            goos: darwin
+            ext: ""
+          - os: macos
+            arch: amd64
+            goos: darwin
+            ext: ""
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: "go.mod"
+
+      - name: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+        run: |
+          go build -mod=vendor -o boxa-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+
+      - name: release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: boxa-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
