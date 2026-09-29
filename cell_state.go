@@ -93,3 +93,21 @@ func (c *cellState) containsCornerMarksOf(other cellState) bool {
 	}
 	return true
 }
+
+func (c *cellState) isColored() bool {
+	return len(c.colors) > 0
+}
+
+func (c *cellState) hasAllColors(colors []color.RGBA) bool {
+	if len(c.colors) < len(colors) {
+		return false
+	}
+
+	for _, color := range colors {
+		if !slices.Contains(c.colors, color) {
+			return false
+		}
+	}
+
+	return true
+}

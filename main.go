@@ -194,6 +194,8 @@ func handleDoubleClick(event Event, sudoku *sudoku) {
 
 	sudoku.selectIf(func(candidate cellState) bool {
 		switch {
+		case clickedCell.isColored():
+			return candidate.hasAllColors(clickedCell.colors)
 		case !clickedCell.isEmpty():
 			return candidate.value == clickedCell.value
 		case clickedCell.hasCenterMarks():
