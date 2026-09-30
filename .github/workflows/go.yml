@@ -1,0 +1,42 @@
+name: go
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+
+      - name: set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: "go.mod"
+
+      - name: install raylib dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgl1-mesa-dev \
+            libxi-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libwayland-dev \
+            libxkbcommon-dev
+
+      - name: check formatting
+        run: test -z "$(gofmt -l .)"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: staticcheck
+        run: go tool staticcheck ./...
+
+      - name: test
+        run: go test ./...
