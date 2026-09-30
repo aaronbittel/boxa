@@ -3,7 +3,6 @@ package fetch
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 )
@@ -12,7 +11,7 @@ type metadata struct {
 	DownloadTokens string `json:"downloadTokens"`
 }
 
-type Data struct {
+type BoardData struct {
 	Cells [9][9]Cell `json:"cells,omitempty"`
 	// Regions   [][][]int64   `json:"regions,omitempty"`
 	// Cages     []interface{} `json:"cages,omitempty"`
@@ -30,23 +29,23 @@ const (
 	baseUrl = "https://firebasestorage.googleapis.com/v0/b/sudoku-sandbox.appspot.com/o"
 )
 
-func FetchSudoku(id string) Data {
+func FetchSudoku(id string) (BoardData, error) {
 	metadataUrl := fmt.Sprintf("%s/%s", baseUrl, id)
 
 	resp, err := http.Get(metadataUrl)
 	if err != nil {
-		log.Fatal(err)
+		return BoardData{}, err
 	}
 	defer resp.Body.Close()
 
 	var m metadata
 	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
-		log.Fatal(err)
+		return BoardData{}, err
 	}
 
 	dataUrl, err := url.Parse(metadataUrl)
 	if err != nil {
-		log.Fatal(err)
+		return BoardData{}, err
 	}
 
 	dataQuery := dataUrl.Query()
@@ -56,14 +55,14 @@ func FetchSudoku(id string) Data {
 
 	resp, err = http.Get(dataUrl.String())
 	if err != nil {
-		log.Fatal()
+		return BoardData{}, err
 	}
 	defer resp.Body.Close()
 
-	var data Data
+	var data BoardData
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		log.Fatal(err)
+		return BoardData{}, err
 	}
 
-	return data
+	return data, nil
 }

@@ -34,7 +34,7 @@ func (s *sudoku) hasCellConflict(x, y int) bool {
 	if s.at(x, y).isEmpty() {
 		return false
 	}
-	return s.hasConflictFor(x, y, s.at(x, y).value)
+	return s.hasConflictFor(x, y, s.at(x, y).Value)
 }
 
 func (s *sudoku) hasCenterMarks(x, y int) bool {
@@ -46,7 +46,7 @@ func (s *sudoku) hasNumberInRow(x, y, value int) bool {
 		if x == xo {
 			continue
 		}
-		if s.at(xo, y).value == value {
+		if s.at(xo, y).Value == value {
 			return true
 		}
 	}
@@ -58,7 +58,7 @@ func (s *sudoku) hasNumberInCol(x, y, value int) bool {
 		if y == yo {
 			continue
 		}
-		if s.at(x, yo).value == value {
+		if s.at(x, yo).Value == value {
 			return true
 		}
 	}
@@ -76,7 +76,7 @@ func (s *sudoku) hasNumberInBox(x, y, value int) bool {
 			if xo == x && yo == y {
 				continue
 			}
-			if s.at(xo, yo).value == value {
+			if s.at(xo, yo).Value == value {
 				return true
 			}
 		}
@@ -86,7 +86,7 @@ func (s *sudoku) hasNumberInBox(x, y, value int) bool {
 
 func (s *sudoku) toggleCornerMark(num int) {
 	s.forEachSelectedCell(func(_ Cell, cell *cellState) {
-		cell.cornerMarks[num] = !cell.cornerMarks[num]
+		cell.CornerMarks[num] = !cell.CornerMarks[num]
 	})
 }
 
@@ -146,15 +146,15 @@ func (s *sudoku) unselectAllCells() {
 	}
 }
 
-func initFilledSudoku() sudoku {
-	s := sudoku{}
+func initFilledSudoku() *sudoku {
+	var sudoku sudoku
 	for y := range cellCount {
 		for x := range cellCount {
 			if rand.IntN(100) < 20 {
-				s[y][x].value = rand.IntN(cellCount) + 1
-				s[y][x].given = true
+				sudoku[y][x].Value = rand.IntN(cellCount) + 1
+				sudoku[y][x].Given = true
 			}
 		}
 	}
-	return s
+	return &sudoku
 }

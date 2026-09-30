@@ -1,9 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"image/color"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -25,6 +26,8 @@ const (
 
 	cellNumberFontSize float32 = cellSize * 0.7
 	textFontSize       float32 = 64.0
+
+	saveStateFilename = "./boxa-savestate.json"
 )
 
 type SelectionMode int
@@ -57,7 +60,7 @@ var pencilMarkCornerOffsets = [cellCount]rl.Vector2{
 	{X: 1, Y: 1},
 }
 
-var regionColors = [6]color.RGBA{
+var cellColors = [6]color.RGBA{
 	rl.NewColor(0xD0, 0xE0, 0xB7, 0xFF),
 	rl.NewColor(0xF1, 0xB0, 0xF7, 0xFF),
 	rl.NewColor(0xEF, 0xC0, 0x84, 0xFF),
@@ -68,27 +71,41 @@ var regionColors = [6]color.RGBA{
 }
 
 func main() {
-	var sudoku sudoku
+	var id string
+	switch len(os.Args) {
+	case 1: // generate sudoku
+	case 2:
+		id = os.Args[1]
+	default:
+		fmt.Fprintf(os.Stderr, "ERROR: too many arguments\nUsage: %s [id]\n", os.Args[0])
+		os.Exit(1)
+	}
 
-	if len(os.Args) >= 2 {
-		data := fetch.FetchSudoku(os.Args[1])
-		if len(data.Cells) != cellCount {
-			panic("illegal cell count")
-		}
-		for y := range cellCount {
-			for x := range cellCount {
-				if data.Cells[y][x].Value != "" {
-					n, err := strconv.Atoi(data.Cells[y][x].Value)
-					if err != nil {
-						log.Fatal(err)
-					}
-					sudoku[y][x].value = n
-					sudoku[y][x].given = true
-				}
-			}
-		}
-	} else {
+	var (
+		sudoku      = &sudoku{}
+		undoHistory = &undoHistory{}
+		elapsed     time.Duration
+	)
+
+	if id == "" {
 		sudoku = initFilledSudoku()
+	} else {
+		saveState, err := loadSaveState(id)
+		switch {
+		case err == nil:
+			sudoku = saveState.Sudoku
+			undoHistory = &saveState.UndoHistory
+			elapsed = saveState.Elapsed
+		case errors.Is(err, os.ErrNotExist):
+			sudoku, err = fetchSudoku(id)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: fetching sudoku failed: %s", err)
+				os.Exit(1)
+			}
+		default:
+			fmt.Fprintf(os.Stderr, "ERROR: loading sudoku save state failed: %s\n", err)
+			os.Exit(1)
+		}
 	}
 
 	rl.InitWindow(width, height, "Boxa")
@@ -103,7 +120,6 @@ func main() {
 	start := time.Now()
 	var duration time.Duration
 	selectionMode := SelectionUnset
-	undoHistory := undoHistory{}
 
 	rl.SetTargetFPS(60)
 
@@ -115,10 +131,10 @@ func main() {
 				if debug {
 					fmt.Println("event", event, "selectionMode", selectionMode)
 				}
-				handleEvent(event, &sudoku, &selectionMode, &undoHistory)
+				handleEvent(event, sudoku, &selectionMode, undoHistory)
 				if sudoku.isSolved() {
 					sudokuIsSolved = true
-					duration = time.Since(start)
+					duration = elapsed + time.Since(start)
 					break
 				}
 			}
@@ -127,10 +143,10 @@ func main() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
 
-		drawCellBackground(sudoku)
-		drawConflictingCells(sudoku)
-		drawSelectedBorders(sudoku)
-		drawSudoku(sudoku, font)
+		drawCellBackground(*sudoku)
+		drawConflictingCells(*sudoku)
+		drawSelectedBorders(*sudoku)
+		drawSudoku(*sudoku, font)
 
 		borderColor := rl.Black
 		if sudokuIsSolved {
@@ -148,6 +164,55 @@ func main() {
 
 		rl.EndDrawing()
 	}
+
+	if id != "" {
+		if !sudoku.isSolved() {
+			saveState := &SaveState{
+				ID:          id,
+				Elapsed:     elapsed + time.Since(start),
+				Sudoku:      sudoku,
+				UndoHistory: *undoHistory,
+			}
+			if err := saveState.storeToFile(saveStateFilename); err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: %s", err)
+				os.Exit(1)
+			}
+			fmt.Printf("INFO: saved state %q\n", saveStateFilename)
+		} else {
+			if err := os.Remove(saveStateFilename); err != nil && !errors.Is(err, os.ErrNotExist) {
+				fmt.Fprintf(os.Stderr, "ERROR: could not delete save state %q: %s\n", saveStateFilename, err)
+				os.Exit(1)
+			}
+
+			fmt.Printf("INFO: deleted save state %q after successfully solving\n", saveStateFilename)
+		}
+	}
+}
+
+func fetchSudoku(id string) (*sudoku, error) {
+	data, err := fetch.FetchSudoku(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data.Cells) != cellCount {
+		return nil, fmt.Errorf("illegal cell count: %d", len(data.Cells))
+	}
+
+	var sudoku sudoku
+	for y := range cellCount {
+		for x := range cellCount {
+			if data.Cells[y][x].Value != "" {
+				n, err := strconv.Atoi(data.Cells[y][x].Value)
+				if err != nil {
+					return nil, err
+				}
+				sudoku[y][x].Value = n
+				sudoku[y][x].Given = true
+			}
+		}
+	}
+	return &sudoku, nil
 }
 
 func handleEvent(event Event, sudoku *sudoku, selectionMode *SelectionMode, undoHistory *undoHistory) {
@@ -195,9 +260,9 @@ func handleDoubleClick(event Event, sudoku *sudoku) {
 	sudoku.selectIf(func(candidate cellState) bool {
 		switch {
 		case clickedCell.isColored():
-			return candidate.hasAllColors(clickedCell.colors)
+			return candidate.hasAllColors(clickedCell.Colors)
 		case !clickedCell.isEmpty():
-			return candidate.value == clickedCell.value
+			return candidate.Value == clickedCell.Value
 		case clickedCell.hasCenterMarks():
 			return candidate.isEmpty() && candidate.containsCenterMarksOf(*clickedCell)
 		case clickedCell.hasCornerMarks():
@@ -239,7 +304,7 @@ func handleDeleteKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 	switch {
 	case event.Modifiers.Ctrl && event.Modifiers.Shift:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			cell.colors = []color.RGBA{}
+			cell.Colors = []color.RGBA{}
 		})
 	case event.Modifiers.Shift:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
@@ -330,7 +395,7 @@ func handleNumberKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 	case event.Modifiers.Ctrl && event.Modifiers.Shift:
 		switch value {
 		case 1, 2, 3, 4, 5:
-			selectedColor := regionColors[value-1]
+			selectedColor := cellColors[value-1]
 			sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 				before := *cell
 				cell.toggleColor(selectedColor)
@@ -355,9 +420,9 @@ func handleNumberKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 		})
 	default:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			if !cell.given {
+			if !cell.Given {
 				before := *cell
-				cell.value = value
+				cell.Value = value
 				undoHistory.record(pos, before, *cell)
 			}
 		})
@@ -633,7 +698,7 @@ var cellRegionsOffsets = map[int]cellLayout{
 func drawCellBackground(s sudoku) {
 	for y := range cellCount {
 		for x := range cellCount {
-			colors := s.at(x, y).colors
+			colors := s.at(x, y).Colors
 			if len(colors) == 0 {
 				continue
 			}
@@ -668,7 +733,7 @@ func drawCellNumber(s sudoku, x, y int, font rl.Font) {
 	cellX := float32(x * cellSize)
 	cellY := float32(y * cellSize)
 
-	text := strconv.Itoa(s.at(x, y).value)
+	text := strconv.Itoa(s.at(x, y).Value)
 	textWidth := rl.MeasureTextEx(font, text, cellNumberFontSize, 0.0)
 	pos := rl.Vector2{
 		X: cellX + (cellSize-textWidth.X)/2,
@@ -676,7 +741,7 @@ func drawCellNumber(s sudoku, x, y int, font rl.Font) {
 	}
 
 	color := defaultColor
-	if s.at(x, y).given {
+	if s.at(x, y).Given {
 		color = rl.Black
 	}
 	rl.DrawTextEx(font, text, pos, cellNumberFontSize, 0.0, color)
@@ -691,7 +756,7 @@ func drawCornerMarks(s sudoku, x, y int, font rl.Font) {
 	cellY := float32(y * cellSize)
 	cornerSize := float32((cellSize - 2*highlightThickness)) / 3
 	i := 0
-	for j, marked := range s.at(x, y).cornerMarks {
+	for j, marked := range s.at(x, y).CornerMarks {
 		num := j + 1
 		if marked {
 			text := strconv.Itoa(num)
@@ -723,7 +788,7 @@ func drawCenterMarks(s sudoku, x, y int, font rl.Font) {
 
 	var sb strings.Builder
 
-	for i, marked := range s.at(x, y).centerMarks {
+	for i, marked := range s.at(x, y).CenterMarks {
 		if marked {
 			fmt.Fprintf(&sb, "%d", i+1)
 		}
@@ -744,7 +809,7 @@ func drawCenterMarks(s sudoku, x, y int, font rl.Font) {
 		Y: float32(y*cellSize) + float32((cellSize-fontSize))/2 + 2,
 	}
 
-	for i, marked := range s.at(x, y).centerMarks {
+	for i, marked := range s.at(x, y).CenterMarks {
 		if !marked {
 			continue
 		}
@@ -882,12 +947,30 @@ func formatDuration(d time.Duration) string {
 }
 
 func drawTriangleCCW(v1, v2, v3 rl.Vector2, color rl.Color) {
-	cross := (v2.X-v1.X)*(v3.Y-v1.Y) -
-		(v2.Y-v1.Y)*(v3.X-v1.X)
+	cross := (v2.X-v1.X)*(v3.Y-v1.Y) - (v2.Y-v1.Y)*(v3.X-v1.X)
 
 	if cross > 0 {
 		rl.DrawTriangle(v1, v3, v2, color)
 	} else {
 		rl.DrawTriangle(v1, v2, v3, color)
 	}
+}
+
+func loadSaveState(id string) (*SaveState, error) {
+	f, err := os.Open(saveStateFilename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var saveState SaveState
+	if err := json.NewDecoder(f).Decode(&saveState); err != nil {
+		return nil, err
+	}
+
+	if saveState.ID != id {
+		return nil, os.ErrNotExist
+	}
+
+	return &saveState, nil
 }

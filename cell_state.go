@@ -2,6 +2,7 @@ package main
 
 import (
 	"cmp"
+	"encoding/json"
 	"image/color"
 	"slices"
 )
@@ -9,76 +10,76 @@ import (
 const emptyCell = 0
 
 type cellState struct {
-	value       int
+	Value       int `json:"value"`
 	selected    bool
-	given       bool
-	cornerMarks [cellCount]bool
-	centerMarks [cellCount]bool
-	colors      []color.RGBA
+	Given       bool            `json:"given"`
+	CornerMarks [cellCount]bool `json:"corner_marks"`
+	CenterMarks [cellCount]bool `json:"center_marks"`
+	Colors      []color.RGBA    `json:"colors,omitempty"`
 }
 
 func (c *cellState) toggleCornerMark(index int) {
 	if index < 0 || index >= cellCount {
 		panic("invalid corner index")
 	}
-	c.cornerMarks[index] = !c.cornerMarks[index]
+	c.CornerMarks[index] = !c.CornerMarks[index]
 }
 
 func (c *cellState) toggleCenterMark(index int) {
 	if index < 0 || index >= cellCount {
 		panic("invalid center index")
 	}
-	c.centerMarks[index] = !c.centerMarks[index]
+	c.CenterMarks[index] = !c.CenterMarks[index]
 }
 
 func (c *cellState) toggleColor(color color.RGBA) {
-	i := slices.Index(c.colors, color)
+	i := slices.Index(c.Colors, color)
 	if i == -1 {
-		c.colors = append(c.colors, color)
+		c.Colors = append(c.Colors, color)
 		c.sortColors()
 	} else {
-		c.colors = slices.Delete(c.colors, i, i+1)
+		c.Colors = slices.Delete(c.Colors, i, i+1)
 	}
 }
 
 func (c *cellState) sortColors() {
-	slices.SortFunc(c.colors, func(a, b color.RGBA) int {
+	slices.SortFunc(c.Colors, func(a, b color.RGBA) int {
 		return cmp.Compare(
-			slices.Index(regionColors[:], a),
-			slices.Index(regionColors[:], b),
+			slices.Index(cellColors[:], a),
+			slices.Index(cellColors[:], b),
 		)
 	})
 }
 
 func (c *cellState) clearCornerMarks() {
-	c.cornerMarks = [cellCount]bool{}
+	c.CornerMarks = [cellCount]bool{}
 }
 
 func (c *cellState) clearCenterMarks() {
-	c.centerMarks = [cellCount]bool{}
+	c.CenterMarks = [cellCount]bool{}
 }
 
 func (c *cellState) clearNumber() {
-	if !c.given {
-		c.value = emptyCell
+	if !c.Given {
+		c.Value = emptyCell
 	}
 }
 
 func (c *cellState) isEmpty() bool {
-	return c.value == emptyCell
+	return c.Value == emptyCell
 }
 
 func (c *cellState) hasCenterMarks() bool {
-	return slices.Contains(c.centerMarks[:], true)
+	return slices.Contains(c.CenterMarks[:], true)
 }
 
 func (c *cellState) hasCornerMarks() bool {
-	return slices.Contains(c.cornerMarks[:], true)
+	return slices.Contains(c.CornerMarks[:], true)
 }
 
 func (c *cellState) containsCenterMarksOf(other cellState) bool {
-	for i, marked := range other.centerMarks {
-		if marked && !c.centerMarks[i] {
+	for i, marked := range other.CenterMarks {
+		if marked && !c.CenterMarks[i] {
 			return false
 		}
 	}
@@ -86,8 +87,8 @@ func (c *cellState) containsCenterMarksOf(other cellState) bool {
 }
 
 func (c *cellState) containsCornerMarksOf(other cellState) bool {
-	for i, marked := range other.cornerMarks {
-		if marked && !c.cornerMarks[i] {
+	for i, marked := range other.CornerMarks {
+		if marked && !c.CornerMarks[i] {
 			return false
 		}
 	}
@@ -95,19 +96,77 @@ func (c *cellState) containsCornerMarksOf(other cellState) bool {
 }
 
 func (c *cellState) isColored() bool {
-	return len(c.colors) > 0
+	return len(c.Colors) > 0
 }
 
 func (c *cellState) hasAllColors(colors []color.RGBA) bool {
-	if len(c.colors) < len(colors) {
+	if len(c.Colors) < len(colors) {
 		return false
 	}
 
 	for _, color := range colors {
-		if !slices.Contains(c.colors, color) {
+		if !slices.Contains(c.Colors, color) {
 			return false
 		}
 	}
 
 	return true
+}
+
+type savedCellState struct {
+	Value      int          `json:"value"`
+	Given      bool         `json:"given,omitempty"`
+	CornerMask uint16       `json:"corner_marks,omitempty"`
+	CenterMask uint16       `json:"center_marks,omitempty"`
+	Colors     []color.RGBA `json:"colors,omitempty"`
+}
+
+func (c cellState) MarshalJSON() ([]byte, error) {
+	return json.Marshal(savedCellState{
+		Value:      c.Value,
+		Given:      c.Given,
+		CornerMask: encodeMarks(c.CornerMarks),
+		CenterMask: encodeMarks(c.CenterMarks),
+		Colors:     c.Colors,
+	})
+}
+
+func (c *cellState) UnmarshalJSON(data []byte) error {
+	var saved savedCellState
+
+	if err := json.Unmarshal(data, &saved); err != nil {
+		return err
+	}
+
+	c.Value = saved.Value
+	c.Given = saved.Given
+	c.CornerMarks = decodeMarks(saved.CornerMask)
+	c.CenterMarks = decodeMarks(saved.CenterMask)
+	c.Colors = saved.Colors
+
+	return nil
+}
+
+func encodeMarks(marks [cellCount]bool) uint16 {
+	var mask uint16
+
+	for i, marked := range marks {
+		if marked {
+			mask |= (1 << i)
+		}
+	}
+
+	return mask
+}
+
+func decodeMarks(mask uint16) [cellCount]bool {
+	var marks [cellCount]bool
+
+	for i := range cellCount {
+		if (mask & (1 << i)) > 0 {
+			marks[i] = true
+		}
+	}
+
+	return marks
 }
