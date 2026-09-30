@@ -4,6 +4,8 @@ import (
 	"math/rand/v2"
 )
 
+const cellCount = 9
+
 type sudoku [cellCount][cellCount]cellState
 
 func (s *sudoku) isSolved() bool {

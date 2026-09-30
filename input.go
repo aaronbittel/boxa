@@ -299,3 +299,259 @@ func (*Input) keyEvent() (Event, bool) {
 
 	return keyEvent, ok
 }
+
+type SelectionMode int
+
+const (
+	SelectionUnset SelectionMode = iota
+	SelectionSelect
+	SelectionDeselect
+)
+
+func (s SelectionMode) String() string {
+	switch s {
+	case SelectionUnset:
+		return "SelectionUnset"
+	case SelectionSelect:
+		return "SelectionSelect"
+	case SelectionDeselect:
+		return "SelectionDeselect"
+	default:
+		panic("new SelectionMode variant was added")
+	}
+}
+
+func handleEvent(event Event, sudoku *sudoku, selectionMode *SelectionMode, undoHistory *undoHistory) {
+	switch event.Type {
+	case EventMousePressed:
+		handleSingleClick(event, sudoku, selectionMode)
+	case EventMouseCellEntered:
+		handleDragging(event, sudoku, selectionMode)
+	case EventMouseDoubleClick:
+		handleDoubleClick(event, sudoku)
+	case EventMouseReleased:
+		*selectionMode = SelectionUnset
+	case EventKeyPressed:
+		switch event.Key {
+		case KeyOne, KeyTwo, KeyThree, KeyFour, KeyFive, KeySix, KeySeven, KeyEight, KeyNine:
+			handleNumberKey(event, sudoku, undoHistory)
+		case KeyDelete:
+			handleDeleteKey(event, sudoku, undoHistory)
+		case KeyArrowUp, KeyArrowDown, KeyArrowRight, KeyArrowLeft:
+			handleArrowKey(event, sudoku)
+		case KeyD: // Debug
+			if event.Modifiers.Ctrl {
+				debug = !debug
+			}
+		case KeyY:
+			if event.Modifiers.Ctrl {
+				undoHistory.redo(sudoku)
+			}
+		case KeyZ:
+			if event.Modifiers.Ctrl {
+				undoHistory.undo(sudoku)
+			}
+		}
+	}
+}
+
+func handleDoubleClick(event Event, sudoku *sudoku) {
+	if !event.Modifiers.Ctrl {
+		sudoku.unselectAllCells()
+	}
+
+	clickedCell := sudoku.at(event.Cell.Col, event.Cell.Row)
+	clickedCell.selected = true
+
+	sudoku.selectIf(func(candidate cellState) bool {
+		switch {
+		case clickedCell.isColored():
+			return candidate.hasAllColors(*clickedCell)
+		case !clickedCell.isEmpty():
+			return candidate.Value == clickedCell.Value
+		case clickedCell.hasCenterMarks():
+			return candidate.isEmpty() && candidate.containsCenterMarksOf(*clickedCell)
+		case clickedCell.hasCornerMarks():
+			return candidate.isEmpty() && candidate.containsCornerMarksOf(*clickedCell)
+		}
+		return false
+	})
+}
+
+func handleDragging(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
+	switch *selectionMode {
+	case SelectionSelect:
+		sudoku.selectCell(event.Cell.Col, event.Cell.Row)
+	case SelectionDeselect:
+		sudoku.deselectCell(event.Cell.Col, event.Cell.Row)
+	}
+}
+
+func handleSingleClick(event Event, sudoku *sudoku, selectionMode *SelectionMode) {
+	if !event.Modifiers.Ctrl {
+		sudoku.unselectAllCells()
+		sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
+		*selectionMode = SelectionSelect
+		return
+	}
+
+	if sudoku.isSelected(event.Cell.Col, event.Cell.Row) {
+		*selectionMode = SelectionDeselect
+	} else {
+		*selectionMode = SelectionSelect
+	}
+	sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
+}
+
+func handleDeleteKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
+	undoHistory.begin()
+	defer undoHistory.commit()
+
+	switch {
+	case event.Modifiers.Ctrl && event.Modifiers.Shift:
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			cell.Colors.clear()
+		})
+	case event.Modifiers.Shift:
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			before := *cell
+			cell.clearCornerMarks()
+			undoHistory.record(pos, before, *cell)
+		})
+	case event.Modifiers.Ctrl:
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			before := *cell
+			cell.clearCenterMarks()
+			undoHistory.record(pos, before, *cell)
+		})
+	default:
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			before := *cell
+			cell.clearNumber()
+			undoHistory.record(pos, before, *cell)
+		})
+	}
+}
+
+func handleArrowKey(event Event, sudoku *sudoku) {
+	var (
+		selectedCount = 0
+		selectedCell  Cell
+	)
+	for y := range cellCount {
+		for x := range cellCount {
+			if sudoku.at(x, y).selected {
+				selectedCount++
+				if selectedCount > 1 {
+					return
+				}
+				selectedCell = Cell{
+					Row: y,
+					Col: x,
+				}
+			}
+		}
+	}
+	if selectedCount == 0 {
+		return
+	}
+
+	sudoku.deselectCell(selectedCell.Col, selectedCell.Row)
+
+	switch event.Key {
+	case KeyArrowUp:
+		if selectedCell.Row == 0 {
+			selectedCell.Row = cellCount - 1
+		} else {
+			selectedCell.Row -= 1
+		}
+	case KeyArrowDown:
+		if selectedCell.Row == cellCount-1 {
+			selectedCell.Row = 0
+		} else {
+			selectedCell.Row += 1
+		}
+	case KeyArrowLeft:
+		if selectedCell.Col == 0 {
+			selectedCell.Col = cellCount - 1
+		} else {
+			selectedCell.Col -= 1
+		}
+	case KeyArrowRight:
+		if selectedCell.Col == cellCount-1 {
+			selectedCell.Col = 0
+		} else {
+			selectedCell.Col += 1
+		}
+	default:
+		panic("illegal key, expected arrow key")
+	}
+
+	sudoku.selectCell(selectedCell.Col, selectedCell.Row)
+}
+
+func handleNumberKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
+	value := event.Key.Value()
+	index := value - 1
+
+	undoHistory.begin()
+	defer undoHistory.commit()
+
+	switch {
+	case event.Modifiers.Ctrl && event.Modifiers.Shift:
+		switch value {
+		case 1, 2, 3, 4, 5:
+			selectedColorIndex := value - 1
+			sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+				before := *cell
+				cell.toggleColor(selectedColorIndex)
+				undoHistory.record(pos, before, *cell)
+			})
+		}
+	case event.Modifiers.Shift:
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			if cell.isEmpty() {
+				before := *cell
+				cell.toggleCornerMark(index)
+				undoHistory.record(pos, before, *cell)
+			}
+		})
+	case event.Modifiers.Ctrl:
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			if cell.isEmpty() {
+				before := *cell
+				cell.toggleCenterMark(index)
+				undoHistory.record(pos, before, *cell)
+			}
+		})
+	default:
+		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			if !cell.Given {
+				before := *cell
+				cell.Value = value
+				undoHistory.record(pos, before, *cell)
+			}
+		})
+	}
+}
+
+func positionToCellIdx(pos rl.Vector2) (x, y int) {
+	return min(cellCount-1, int(pos.X/cellSize)), min(cellCount-1, int(pos.Y/cellSize))
+}
+
+func isInsideSelectionArea(pos rl.Vector2, x, y int) bool {
+	r1 := rl.Rectangle{
+		X:      float32(x) * cellSize,
+		Y:      float32(y)*cellSize + selectionMargin,
+		Width:  cellSize,
+		Height: cellSize - 2*selectionMargin,
+	}
+	r2 := rl.Rectangle{
+		X:      float32(x)*cellSize + selectionMargin,
+		Y:      float32(y) * cellSize,
+		Width:  cellSize - 2*selectionMargin,
+		Height: cellSize,
+	}
+
+	return rl.CheckCollisionPointRec(pos, r1) || rl.CheckCollisionPointRec(pos, r2)
+}
