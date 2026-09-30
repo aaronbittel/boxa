@@ -12,7 +12,7 @@ Boxa takes a SudokuPad puzzle ID, downloads the puzzle, and lets you solve it lo
 Start Boxa with a SudokuPad puzzle ID:
 
 ```bash
-go run . T8qj67f8Mg
+go run . -id T8qj67f8Mg
 ```
 
 For example, the ID from:
@@ -23,10 +23,16 @@ https://sudokupad.app/T8qj67f8Mg
 
 Boxa downloads the initial puzzle state and populates the grid.
 
+## Saving
+
+Boxa automatically saves the current puzzle state when you close the application if the
+Sudoku is not solved. Your progress is restored the next time you start Boxa with the
+same puzzle ID.
+
 ## Controls
 
 | Key                         | Action              |
-| --------------------------- | ------------------- |
+| --------------------------- | --------------------|
 | `1`–`9`                     | Enter a number      |
 | `Backspace` / `Delete`      | Clear a cell        |
 | `Arrow keys`                | Move the selection  |
@@ -38,6 +44,7 @@ Boxa downloads the initial puzzle state and populates the grid.
 | `Ctrl` + `Shift` + `Delete` | Clear cell colors   |
 | `Ctrl` + `Z`                | Undo                |
 | `Ctrl` + `Y`                | Redo                |
+| `Ctrl` + `R`                | Reset the Sudoku    |
 
 ### Mouse
 
@@ -57,5 +64,5 @@ go build -o boxa .
 Then:
 
 ```bash
-./boxa T8qj67f8Mg
+./boxa -id T8qj67f8Mg
 ```
