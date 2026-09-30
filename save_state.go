@@ -13,7 +13,7 @@ type SaveState struct {
 	ID          string        `json:"id"`
 	Elapsed     time.Duration `json:"elapsed"`
 	Sudoku      *sudoku       `json:"board_data"`
-	UndoHistory undoHistory   `json:"undo_history"`
+	UndoHistory *undoHistory  `json:"undo_history"`
 }
 
 func (s SaveState) encode(w io.Writer) error {

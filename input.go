@@ -123,6 +123,37 @@ type Cell struct {
 	Col int
 }
 
+func (c *Cell) move(moveDirection moveDirection) {
+	switch moveDirection {
+	case moveUp:
+		if c.Row == 0 {
+			c.Row = cellCount - 1
+		} else {
+			c.Row -= 1
+		}
+	case moveDown:
+		if c.Row == cellCount-1 {
+			c.Row = 0
+		} else {
+			c.Row += 1
+		}
+	case moveLeft:
+		if c.Col == 0 {
+			c.Col = cellCount - 1
+		} else {
+			c.Col -= 1
+		}
+	case moveRight:
+		if c.Col == cellCount-1 {
+			c.Col = 0
+		} else {
+			c.Col += 1
+		}
+	default:
+		panic("illegal key, expected arrow key")
+	}
+}
+
 func (c Cell) String() string {
 	return fmt.Sprintf("x=%d, y=%d", c.Col, c.Row)
 }
@@ -236,11 +267,6 @@ func (i *Input) mouseEvent() (Event, bool) {
 			panic("invalid input state, must be active")
 		}
 		i.mouse.Active = false
-		return Event{
-			Type:      EventMouseReleased,
-			Cell:      currentCell,
-			Modifiers: modifiers,
-		}, true
 	}
 
 	return Event{}, false
@@ -334,8 +360,6 @@ func handleEvent(event Event, gameState *gameState) {
 		handleDragging(event, gameState)
 	case EventMouseDoubleClick:
 		handleDoubleClick(event, gameState)
-	case EventMouseReleased:
-		gameState.selectionMode = selectionUnset
 	case EventKeyPressed:
 		switch event.Key {
 		case KeyOne, KeyTwo, KeyThree, KeyFour, KeyFive, KeySix, KeySeven, KeyEight, KeyNine:
@@ -351,7 +375,7 @@ func handleEvent(event Event, gameState *gameState) {
 		case KeyR:
 			if event.Modifiers.Ctrl {
 				gameState.sudoku.reset()
-				gameState.undoHistory = undoHistory{}
+				gameState.undoHistory = &undoHistory{}
 			}
 		case KeyY:
 			if event.Modifiers.Ctrl {
@@ -366,6 +390,8 @@ func handleEvent(event Event, gameState *gameState) {
 }
 
 func handleDoubleClick(event Event, gameState *gameState) {
+	gameState.currentCell = event.Cell
+
 	if !event.Modifiers.Ctrl {
 		gameState.sudoku.unselectAllCells()
 	}
@@ -389,6 +415,8 @@ func handleDoubleClick(event Event, gameState *gameState) {
 }
 
 func handleDragging(event Event, gameState *gameState) {
+	gameState.currentCell = event.Cell
+
 	switch gameState.selectionMode {
 	case selectionSelect:
 		gameState.sudoku.selectCell(event.Cell.Col, event.Cell.Row)
@@ -398,7 +426,10 @@ func handleDragging(event Event, gameState *gameState) {
 }
 
 func handleSingleClick(event Event, gameState *gameState) {
+	gameState.currentCell = event.Cell
+
 	if !event.Modifiers.Ctrl {
+		gameState.selectionMode = selectionSelect
 		gameState.sudoku.unselectAllCells()
 		gameState.sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
 		gameState.selectionMode = selectionSelect
@@ -444,60 +475,25 @@ func handleDeleteKey(event Event, gameState *gameState) {
 }
 
 func handleArrowKey(event Event, gameState *gameState) {
-	var (
-		selectedCount = 0
-		selectedCell  Cell
-	)
-	for y := range cellCount {
-		for x := range cellCount {
-			if gameState.sudoku.at(x, y).selected {
-				selectedCount++
-				if selectedCount > 1 {
-					return
-				}
-				selectedCell = Cell{
-					Row: y,
-					Col: x,
-				}
-			}
-		}
-	}
-	if selectedCount == 0 {
+	moveDir, ok := arrowKeyDirection(event.Key)
+	if !ok {
 		return
 	}
 
-	gameState.sudoku.deselectCell(selectedCell.Col, selectedCell.Row)
+	gameState.currentCell.move(moveDir)
 
-	switch event.Key {
-	case KeyArrowUp:
-		if selectedCell.Row == 0 {
-			selectedCell.Row = cellCount - 1
-		} else {
-			selectedCell.Row -= 1
-		}
-	case KeyArrowDown:
-		if selectedCell.Row == cellCount-1 {
-			selectedCell.Row = 0
-		} else {
-			selectedCell.Row += 1
-		}
-	case KeyArrowLeft:
-		if selectedCell.Col == 0 {
-			selectedCell.Col = cellCount - 1
-		} else {
-			selectedCell.Col -= 1
-		}
-	case KeyArrowRight:
-		if selectedCell.Col == cellCount-1 {
-			selectedCell.Col = 0
-		} else {
-			selectedCell.Col += 1
-		}
-	default:
-		panic("illegal key, expected arrow key")
+	if !event.Modifiers.Ctrl && !event.Modifiers.Shift {
+		gameState.sudoku.unselectAllCells()
+		gameState.sudoku.selectCell(gameState.currentCell.Col, gameState.currentCell.Row)
+		return
 	}
 
-	gameState.sudoku.selectCell(selectedCell.Col, selectedCell.Row)
+	switch gameState.selectionMode {
+	case selectionSelect:
+		gameState.sudoku.selectCell(gameState.currentCell.Col, gameState.currentCell.Row)
+	case selectionDeselect:
+		gameState.sudoku.deselectCell(gameState.currentCell.Col, gameState.currentCell.Row)
+	}
 }
 
 func handleNumberKey(event Event, gameState *gameState) {
@@ -563,3 +559,27 @@ func isInsideSelectionArea(pos rl.Vector2, x, y int) bool {
 
 	return rl.CheckCollisionPointRec(pos, r1) || rl.CheckCollisionPointRec(pos, r2)
 }
+
+func arrowKeyDirection(key Key) (moveDirection, bool) {
+	switch key {
+	case KeyArrowUp:
+		return moveUp, true
+	case KeyArrowDown:
+		return moveDown, true
+	case KeyArrowLeft:
+		return moveLeft, true
+	case KeyArrowRight:
+		return moveRight, true
+	default:
+		return 0, false
+	}
+}
+
+type moveDirection int
+
+const (
+	moveUp moveDirection = iota
+	moveDown
+	moveLeft
+	moveRight
+)

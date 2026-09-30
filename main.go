@@ -15,8 +15,9 @@ import (
 type gameState struct {
 	id             string
 	sudoku         *sudoku
-	undoHistory    undoHistory
+	undoHistory    *undoHistory
 	elapsed        time.Duration
+	currentCell    Cell
 	selectionMode  selectionMode
 	sudokuIsSolved bool
 }
@@ -118,7 +119,8 @@ func main() {
 func loadGameState(id string) (*gameState, error) {
 	if id == "" {
 		return &gameState{
-			sudoku: initFilledSudoku(),
+			sudoku:      initFilledSudoku(),
+			undoHistory: &undoHistory{},
 		}, nil
 	}
 
@@ -144,8 +146,9 @@ func loadGameState(id string) (*gameState, error) {
 	}
 
 	return &gameState{
-		id:     id,
-		sudoku: sudoku,
+		id:          id,
+		sudoku:      sudoku,
+		undoHistory: &undoHistory{},
 	}, nil
 }
 
