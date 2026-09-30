@@ -31,20 +31,21 @@ same puzzle ID.
 
 ## Controls
 
-| Key                         | Action              |
-| --------------------------- | --------------------|
-| `1`–`9`                     | Enter a number      |
-| `Backspace` / `Delete`      | Clear a cell        |
-| `Arrow keys`                | Move the selection  |
-| `Shift` + `1`–`9`           | Toggle corner marks |
-| `Ctrl` + `1`–`9`            | Toggle center marks |
-| `Ctrl` + `Shift` + `1`–`5`  | Toggle cell colors  |
-| `Ctrl` + `Delete`           | Clear center marks  |
-| `Shift` + `Delete`          | Clear corner marks  |
-| `Ctrl` + `Shift` + `Delete` | Clear cell colors   |
-| `Ctrl` + `Z`                | Undo                |
-| `Ctrl` + `Y`                | Redo                |
-| `Ctrl` + `R`                | Reset the Sudoku    |
+| Key                                  | Action                    |
+| ------------------------------------ | ------------------------- |
+| `1`–`9`                              | Enter a number            |
+| `Backspace` / `Delete`               | Clear a cell              |
+| `Arrow keys`                         | Move the selection        |
+| `Shift` / `Ctrl` + `Arrow keys`      | Select cells while moving |
+| `Shift` + `1`–`9`                    | Toggle corner marks       |
+| `Ctrl` + `1`–`9`                     | Toggle center marks       |
+| `Ctrl` + `Shift` + `1`–`5`           | Toggle cell colors        |
+| `Ctrl` + `Delete`                    | Clear center marks        |
+| `Shift` + `Delete`                   | Clear corner marks        |
+| `Ctrl` + `Shift` + `Delete`          | Clear cell colors         |
+| `Ctrl` + `Z`                         | Undo                      |
+| `Ctrl` + `Y`                         | Redo                      |
+| `Ctrl` + `R`                         | Reset the Sudoku          |
 
 ### Mouse
 
