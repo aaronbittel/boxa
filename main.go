@@ -260,7 +260,7 @@ func handleDoubleClick(event Event, sudoku *sudoku) {
 	sudoku.selectIf(func(candidate cellState) bool {
 		switch {
 		case clickedCell.isColored():
-			return candidate.hasAllColors(clickedCell.Colors)
+			return candidate.hasAllColors(clickedCell.ColorMask)
 		case !clickedCell.isEmpty():
 			return candidate.Value == clickedCell.Value
 		case clickedCell.hasCenterMarks():
@@ -304,7 +304,7 @@ func handleDeleteKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 	switch {
 	case event.Modifiers.Ctrl && event.Modifiers.Shift:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			cell.Colors = []color.RGBA{}
+			cell.ColorMask.clear()
 		})
 	case event.Modifiers.Shift:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
@@ -395,10 +395,10 @@ func handleNumberKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 	case event.Modifiers.Ctrl && event.Modifiers.Shift:
 		switch value {
 		case 1, 2, 3, 4, 5:
-			selectedColor := cellColors[value-1]
+			selectedColorIndex := value - 1
 			sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 				before := *cell
-				cell.toggleColor(selectedColor)
+				cell.toggleColor(selectedColorIndex)
 				undoHistory.record(pos, before, *cell)
 			})
 		}
@@ -698,18 +698,15 @@ var cellRegionsOffsets = map[int]cellLayout{
 func drawCellBackground(s sudoku) {
 	for y := range cellCount {
 		for x := range cellCount {
-			colors := s.at(x, y).Colors
-			if len(colors) == 0 {
+			cell := s.at(x, y)
+
+			if !cell.isColored() {
 				continue
 			}
 
-			layout, ok := cellRegionsOffsets[len(colors)]
+			layout, ok := cellRegionsOffsets[cell.colorCount()]
 			if !ok {
 				continue
-			}
-
-			if len(layout) != len(colors) {
-				panic("region count must match color count")
 			}
 
 			cellPos := rl.Vector2{
@@ -717,12 +714,19 @@ func drawCellBackground(s sudoku) {
 				Y: float32(y * cellSize),
 			}
 
+			indexes := cell.colorIndexes()
+
+			if len(layout) != len(indexes) {
+				panic("cell color layout and color index count mismatch")
+			}
+
 			for i, region := range layout {
+				color := cellColors[indexes[i]]
 				for _, triangle := range region {
 					v1 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[0], float32(cellSize)))
 					v2 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[1], float32(cellSize)))
 					v3 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[2], float32(cellSize)))
-					drawTriangleCCW(v1, v2, v3, colors[i])
+					drawTriangleCCW(v1, v2, v3, color)
 				}
 			}
 		}

@@ -1,9 +1,7 @@
 package main
 
 import (
-	"cmp"
 	"encoding/json"
-	"image/color"
 	"slices"
 )
 
@@ -15,7 +13,7 @@ type cellState struct {
 	Given       bool            `json:"given"`
 	CornerMarks [cellCount]bool `json:"corner_marks"`
 	CenterMarks [cellCount]bool `json:"center_marks"`
-	Colors      []color.RGBA    `json:"colors,omitempty"`
+	ColorMask   bitMask         `json:"color_mask,omitempty"`
 }
 
 func (c *cellState) toggleCornerMark(index int) {
@@ -32,23 +30,8 @@ func (c *cellState) toggleCenterMark(index int) {
 	c.CenterMarks[index] = !c.CenterMarks[index]
 }
 
-func (c *cellState) toggleColor(color color.RGBA) {
-	i := slices.Index(c.Colors, color)
-	if i == -1 {
-		c.Colors = append(c.Colors, color)
-		c.sortColors()
-	} else {
-		c.Colors = slices.Delete(c.Colors, i, i+1)
-	}
-}
-
-func (c *cellState) sortColors() {
-	slices.SortFunc(c.Colors, func(a, b color.RGBA) int {
-		return cmp.Compare(
-			slices.Index(cellColors[:], a),
-			slices.Index(cellColors[:], b),
-		)
-	})
+func (c *cellState) toggleColor(index int) {
+	c.ColorMask.toggle(index)
 }
 
 func (c *cellState) clearCornerMarks() {
@@ -96,29 +79,32 @@ func (c *cellState) containsCornerMarksOf(other cellState) bool {
 }
 
 func (c *cellState) isColored() bool {
-	return len(c.Colors) > 0
+	return c.ColorMask.count() > 0
 }
 
-func (c *cellState) hasAllColors(colors []color.RGBA) bool {
-	if len(c.Colors) < len(colors) {
-		return false
-	}
+func (c *cellState) colorCount() int {
+	return c.ColorMask.count()
+}
 
-	for _, color := range colors {
-		if !slices.Contains(c.Colors, color) {
+func (c *cellState) hasAllColors(other bitMask) bool {
+	for i := range len(cellColors) {
+		if other.has(i) && !c.ColorMask.has(i) {
 			return false
 		}
 	}
-
 	return true
 }
 
+func (c *cellState) colorIndexes() []int {
+	return c.ColorMask.indexes()
+}
+
 type savedCellState struct {
-	Value      int          `json:"value"`
-	Given      bool         `json:"given,omitempty"`
-	CornerMask uint16       `json:"corner_marks,omitempty"`
-	CenterMask uint16       `json:"center_marks,omitempty"`
-	Colors     []color.RGBA `json:"colors,omitempty"`
+	Value      int     `json:"value"`
+	Given      bool    `json:"given,omitempty"`
+	CornerMask uint16  `json:"corner_marks,omitempty"`
+	CenterMask uint16  `json:"center_marks,omitempty"`
+	ColorMask  bitMask `json:"color_mask,omitempty"`
 }
 
 func (c cellState) MarshalJSON() ([]byte, error) {
@@ -127,7 +113,7 @@ func (c cellState) MarshalJSON() ([]byte, error) {
 		Given:      c.Given,
 		CornerMask: encodeMarks(c.CornerMarks),
 		CenterMask: encodeMarks(c.CenterMarks),
-		Colors:     c.Colors,
+		ColorMask:  c.ColorMask,
 	})
 }
 
@@ -142,7 +128,7 @@ func (c *cellState) UnmarshalJSON(data []byte) error {
 	c.Given = saved.Given
 	c.CornerMarks = decodeMarks(saved.CornerMask)
 	c.CenterMarks = decodeMarks(saved.CenterMask)
-	c.Colors = saved.Colors
+	c.ColorMask = saved.ColorMask
 
 	return nil
 }
