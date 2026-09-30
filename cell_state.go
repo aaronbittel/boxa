@@ -26,7 +26,16 @@ func (c *cellState) toggleCenterMark(index int) {
 }
 
 func (c *cellState) toggleColor(index int) {
-	c.Colors.toggle(index)
+	if c.Colors.has(index) {
+		c.Colors.unset(index)
+		return
+	}
+
+	if c.colorCount() >= len(cellRegionsOffsets) {
+		return
+	}
+
+	c.Colors.set(index)
 }
 
 func (c *cellState) clearCornerMarks() {

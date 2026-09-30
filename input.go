@@ -509,12 +509,10 @@ func handleNumberKey(event Event, gameState *gameState) {
 
 	switch {
 	case event.Modifiers.Ctrl && event.Modifiers.Shift:
-		switch value {
-		case 1, 2, 3, 4, 5:
-			selectedColorIndex := value - 1
+		if index < len(cellColors) {
 			gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 				before := *cell
-				cell.toggleColor(selectedColorIndex)
+				cell.toggleColor(index)
 				gameState.undoHistory.record(pos, before, *cell)
 			})
 		}
