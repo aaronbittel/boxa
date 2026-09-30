@@ -54,10 +54,6 @@ func (s *sudoku) hasCellConflict(x, y int) bool {
 	return s.hasConflictFor(x, y, s.at(x, y).Value)
 }
 
-func (s *sudoku) hasCenterMarks(x, y int) bool {
-	return s.at(x, y).hasCenterMarks()
-}
-
 func (s *sudoku) hasNumberInRow(x, y, value int) bool {
 	for xo := range cellCount {
 		if x == xo {

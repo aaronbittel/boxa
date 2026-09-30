@@ -118,7 +118,7 @@ func drawSudokuSolvedScreen(duration time.Duration, font rl.Font) {
 	}
 
 	rl.DrawRectangleRounded(bg, 0.4, 32, solvedSudokuBorderColor)
-	rl.DrawTextEx(font, congratsText, congratsTextPos, textFontSize, spacing, solvedSudokuBorderColor)
+	rl.DrawTextEx(font, congratsText, congratsTextPos, textFontSize, spacing, solvedScreenBackgroundColor)
 	rl.DrawTextEx(font, timeText, timeTextPos, textFontSize, spacing, solvedSudokuBorderColor)
 }
 
@@ -462,26 +462,20 @@ func drawSelectedBorders(s sudoku) {
 				color = conflictBorderColor
 			}
 
-			edgesCount := 0
-
 			cellX := int32(x * cellSize)
 			cellY := int32(y * cellSize)
 
 			if y == 0 || !s.at(x, y-1).selected {
 				rl.DrawRectangle(cellX, cellY, cellSize, highlightThickness, color)
-				edgesCount++
 			}
 			if y == 8 || !s.at(x, y+1).selected {
 				rl.DrawRectangle(cellX, cellY+cellSize-highlightThickness, cellSize, highlightThickness, color)
-				edgesCount++
 			}
 			if x == 0 || !s.at(x-1, y).selected {
 				rl.DrawRectangle(cellX, cellY, highlightThickness, cellSize, color)
-				edgesCount++
 			}
 			if x == 8 || !s.at(x+1, y).selected {
 				rl.DrawRectangle(cellX+cellSize-highlightThickness, cellY, highlightThickness, cellSize, color)
-				edgesCount++
 			}
 
 			if y > 0 && x < cellCount-1 && s.at(x, y-1).selected && s.at(x+1, y).selected && !s.at(x+1, y-1).selected {
@@ -502,16 +496,6 @@ func drawSelectedBorders(s sudoku) {
 			}
 		}
 	}
-}
-
-func drawSelectedCell(y, x int) {
-	rec := rl.Rectangle{
-		X:      float32(x) * cellSize,
-		Y:      float32(y) * cellSize,
-		Width:  cellSize,
-		Height: cellSize,
-	}
-	rl.DrawRectangleLinesEx(rec, borderThickness, numberColor)
 }
 
 func drawConflictingCells(s sudoku) {

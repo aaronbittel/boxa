@@ -100,17 +100,6 @@ func (u *undoHistory) redo(s *sudoku) {
 	u.Cursor++
 }
 
-func (u *undoHistory) add(entry HistoryEntry) {
-	if len(entry) == 0 {
-		return
-	}
-
-	u.Entries = u.Entries[:u.Cursor]
-
-	u.Entries = append(u.Entries, entry)
-	u.Cursor++
-}
-
 func (u *undoHistory) begin() {
 	u.current = HistoryEntry{}
 }
