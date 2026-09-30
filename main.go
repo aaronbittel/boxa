@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -11,44 +12,25 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
+type gameState struct {
+	id             string
+	sudoku         *sudoku
+	undoHistory    undoHistory
+	elapsed        time.Duration
+	selectionMode  selectionMode
+	sudokuIsSolved bool
+}
+
 var debug = false
 
 func main() {
-	var id string
-	switch len(os.Args) {
-	case 1: // generate sudoku
-	case 2:
-		id = os.Args[1]
-	default:
-		fmt.Fprintf(os.Stderr, "ERROR: too many arguments\nUsage: %s [id]\n", os.Args[0])
+	id := flag.String("id", "", "id of sudoku")
+	flag.Parse()
+
+	game, err := loadGameState(*id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: loading game state: %s\n", err)
 		os.Exit(1)
-	}
-
-	var (
-		sudoku      = &sudoku{}
-		undoHistory = &undoHistory{}
-		elapsed     time.Duration
-	)
-
-	if id == "" {
-		sudoku = initFilledSudoku()
-	} else {
-		saveState, err := loadSaveState(id)
-		switch {
-		case err == nil:
-			sudoku = saveState.Sudoku
-			undoHistory = &saveState.UndoHistory
-			elapsed = saveState.Elapsed
-		case errors.Is(err, os.ErrNotExist):
-			sudoku, err = fetchSudoku(id)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: fetching sudoku failed: %s", err)
-				os.Exit(1)
-			}
-		default:
-			fmt.Fprintf(os.Stderr, "ERROR: loading sudoku save state failed: %s\n", err)
-			os.Exit(1)
-		}
 	}
 
 	rl.InitWindow(windowWidth, windowHeight, "Boxa")
@@ -59,25 +41,23 @@ func main() {
 
 	var input Input
 
-	sudokuIsSolved := false
 	start := time.Now()
 	var duration time.Duration
-	selectionMode := SelectionUnset
 
 	rl.SetTargetFPS(60)
 
 	for !rl.WindowShouldClose() {
-		if !sudokuIsSolved {
+		if !game.sudokuIsSolved {
 			events := input.poll()
 
 			for _, event := range events {
 				if debug {
-					fmt.Println("event", event, "selectionMode", selectionMode)
+					fmt.Println("event", event, "selectionMode", game.selectionMode)
 				}
-				handleEvent(event, sudoku, &selectionMode, undoHistory)
-				if sudoku.isSolved() {
-					sudokuIsSolved = true
-					duration = elapsed + time.Since(start)
+				handleEvent(event, game)
+				if game.sudoku.isSolved() {
+					game.sudokuIsSolved = true
+					duration = game.elapsed + time.Since(start)
 					break
 				}
 			}
@@ -86,18 +66,18 @@ func main() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
 
-		drawCellBackground(*sudoku)
-		drawConflictingCells(*sudoku)
-		drawSelectedBorders(*sudoku)
-		drawSudoku(*sudoku, font)
+		drawCellBackground(*game.sudoku)
+		drawConflictingCells(*game.sudoku)
+		drawSelectedBorders(*game.sudoku)
+		drawSudoku(*game.sudoku, font)
 
 		borderColor := rl.Black
-		if sudokuIsSolved {
+		if game.sudokuIsSolved {
 			borderColor = rl.Green
 		}
 
 		drawGrid(borderColor)
-		if sudokuIsSolved {
+		if game.sudokuIsSolved {
 			drawSudokuSolvedScreen(duration, font)
 		}
 
@@ -108,28 +88,65 @@ func main() {
 		rl.EndDrawing()
 	}
 
-	if id != "" {
-		if !sudoku.isSolved() {
-			saveState := &SaveState{
-				ID:          id,
-				Elapsed:     elapsed + time.Since(start),
-				Sudoku:      sudoku,
-				UndoHistory: *undoHistory,
-			}
-			if err := saveState.storeToFile(saveStateFilename); err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: %s", err)
-				os.Exit(1)
-			}
-			fmt.Printf("INFO: saved state %q\n", saveStateFilename)
-		} else {
-			if err := os.Remove(saveStateFilename); err != nil && !errors.Is(err, os.ErrNotExist) {
-				fmt.Fprintf(os.Stderr, "ERROR: could not delete save state %q: %s\n", saveStateFilename, err)
-				os.Exit(1)
-			}
-
-			fmt.Printf("INFO: deleted save state %q after successfully solving\n", saveStateFilename)
-		}
+	if game.id == "" {
+		os.Exit(0)
 	}
+
+	if game.sudoku.isSolved() {
+		if err := deleteSaveState(); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: could not delete save state %q: %s", saveStateFilename, err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("INFO: deleted save state %q after successfully solving\n", saveStateFilename)
+		os.Exit(0)
+	}
+
+	saveState := &SaveState{
+		ID:          game.id,
+		Elapsed:     game.elapsed + time.Since(start),
+		Sudoku:      game.sudoku,
+		UndoHistory: game.undoHistory,
+	}
+	if err := saveState.storeToFile(saveStateFilename); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: %s", err)
+		os.Exit(1)
+	}
+	fmt.Printf("INFO: saved state %q\n", saveStateFilename)
+}
+
+func loadGameState(id string) (*gameState, error) {
+	if id == "" {
+		return &gameState{
+			sudoku: initFilledSudoku(),
+		}, nil
+	}
+
+	saveState, err := loadSaveState(id)
+	switch {
+	case err == nil:
+		if saveState.ID == id {
+			return &gameState{
+				id:          id,
+				sudoku:      saveState.Sudoku,
+				undoHistory: saveState.UndoHistory,
+				elapsed:     saveState.Elapsed,
+			}, nil
+		}
+
+	case !errors.Is(err, os.ErrNotExist):
+		return nil, fmt.Errorf("reading save state: %w", err)
+	}
+
+	sudoku, err := fetchSudoku(id)
+	if err != nil {
+		return nil, fmt.Errorf("fetching sudoku with id %s: %w", id, err)
+	}
+
+	return &gameState{
+		id:     id,
+		sudoku: sudoku,
+	}, nil
 }
 
 func fetchSudoku(id string) (*sudoku, error) {
@@ -156,4 +173,13 @@ func fetchSudoku(id string) (*sudoku, error) {
 		}
 	}
 	return &sudoku, nil
+}
+
+func deleteSaveState() error {
+	if err := os.Remove(saveStateFilename); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	return nil
+
 }
