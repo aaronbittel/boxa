@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -e
+
+echo "==> gofmt"
+if [ -n "$(gofmt -l .)" ]; then
+    echo "Files need formatting:"
+    gofmt -l .
+    exit 1
+fi
+
+echo "==> go vet"
+go vet ./...
+
+echo "==> staticcheck"
+go tool staticcheck ./...
+
+echo "==> go test"
+go test ./...
+
+echo "All checks passed."
