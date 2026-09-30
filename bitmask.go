@@ -47,3 +47,7 @@ func (b bitMask) indexes() []int {
 
 	return indexes
 }
+
+func (b bitMask) contains(other bitMask) bool {
+	return b&other == other
+}

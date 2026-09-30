@@ -260,7 +260,7 @@ func handleDoubleClick(event Event, sudoku *sudoku) {
 	sudoku.selectIf(func(candidate cellState) bool {
 		switch {
 		case clickedCell.isColored():
-			return candidate.hasAllColors(clickedCell.ColorMask)
+			return candidate.hasAllColors(*clickedCell)
 		case !clickedCell.isEmpty():
 			return candidate.Value == clickedCell.Value
 		case clickedCell.hasCenterMarks():
@@ -304,7 +304,7 @@ func handleDeleteKey(event Event, sudoku *sudoku, undoHistory *undoHistory) {
 	switch {
 	case event.Modifiers.Ctrl && event.Modifiers.Shift:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			cell.ColorMask.clear()
+			cell.Colors.clear()
 		})
 	case event.Modifiers.Shift:
 		sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
@@ -760,28 +760,25 @@ func drawCornerMarks(s sudoku, x, y int, font rl.Font) {
 	cellY := float32(y * cellSize)
 	cornerSize := float32((cellSize - 2*highlightThickness)) / 3
 	i := 0
-	for j, marked := range s.at(x, y).CornerMarks {
-		num := j + 1
-		if marked {
-			text := strconv.Itoa(num)
-			markSize := rl.MeasureTextEx(font, text, cornerSize, 0.0)
+	for _, num := range s.at(x, y).cornerMarks() {
+		text := strconv.Itoa(num)
+		markSize := rl.MeasureTextEx(font, text, cornerSize, 0.0)
 
-			offset := pencilMarkCornerOffsets[i]
-			markX := cellX + highlightThickness + offset.X*cornerSize + (cornerSize-markSize.X)/2
-			markY := cellY + highlightThickness + offset.Y*cornerSize + 4
+		offset := pencilMarkCornerOffsets[i]
+		markX := cellX + highlightThickness + offset.X*cornerSize + (cornerSize-markSize.X)/2
+		markY := cellY + highlightThickness + offset.Y*cornerSize + 4
 
-			pos := rl.Vector2{
-				X: markX,
-				Y: markY,
-			}
-
-			color := defaultColor
-			if s.hasConflictFor(x, y, num) {
-				color = conflictPencilMarkColor
-			}
-			rl.DrawTextEx(font, text, pos, cornerSize, 0.0, color)
-			i++
+		pos := rl.Vector2{
+			X: markX,
+			Y: markY,
 		}
+
+		color := defaultColor
+		if s.hasConflictFor(x, y, num) {
+			color = conflictPencilMarkColor
+		}
+		rl.DrawTextEx(font, text, pos, cornerSize, 0.0, color)
+		i++
 	}
 }
 
@@ -792,10 +789,8 @@ func drawCenterMarks(s sudoku, x, y int, font rl.Font) {
 
 	var sb strings.Builder
 
-	for i, marked := range s.at(x, y).CenterMarks {
-		if marked {
-			fmt.Fprintf(&sb, "%d", i+1)
-		}
+	for _, num := range s.at(x, y).centerMarks() {
+		fmt.Fprintf(&sb, "%d", num)
 	}
 
 	text := sb.String()
@@ -813,12 +808,7 @@ func drawCenterMarks(s sudoku, x, y int, font rl.Font) {
 		Y: float32(y*cellSize) + float32((cellSize-fontSize))/2 + 2,
 	}
 
-	for i, marked := range s.at(x, y).CenterMarks {
-		if !marked {
-			continue
-		}
-
-		num := i + 1
+	for _, num := range s.at(x, y).centerMarks() {
 		color := defaultColor
 		if s.hasConflictFor(x, y, num) {
 			color = conflictPencilMarkColor

@@ -84,12 +84,6 @@ func (s *sudoku) hasNumberInBox(x, y, value int) bool {
 	return false
 }
 
-func (s *sudoku) toggleCornerMark(num int) {
-	s.forEachSelectedCell(func(_ Cell, cell *cellState) {
-		cell.CornerMarks[num] = !cell.CornerMarks[num]
-	})
-}
-
 func (s *sudoku) selectIf(predicate func(cell cellState) bool) {
 	for y := range cellCount {
 		for x := range cellCount {

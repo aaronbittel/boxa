@@ -1,45 +1,40 @@
 package main
 
-import (
-	"encoding/json"
-	"slices"
-)
-
 const emptyCell = 0
 
 type cellState struct {
 	Value       int `json:"value"`
 	selected    bool
-	Given       bool            `json:"given"`
-	CornerMarks [cellCount]bool `json:"corner_marks"`
-	CenterMarks [cellCount]bool `json:"center_marks"`
-	ColorMask   bitMask         `json:"color_mask,omitempty"`
+	Given       bool    `json:"given,omitempty"`
+	CornerMarks bitMask `json:"corner_marks,omitempty"`
+	CenterMarks bitMask `json:"center_marks,omitempty"`
+	Colors      bitMask `json:"colors,omitempty"`
 }
 
 func (c *cellState) toggleCornerMark(index int) {
 	if index < 0 || index >= cellCount {
 		panic("invalid corner index")
 	}
-	c.CornerMarks[index] = !c.CornerMarks[index]
+	c.CornerMarks.toggle(index)
 }
 
 func (c *cellState) toggleCenterMark(index int) {
 	if index < 0 || index >= cellCount {
 		panic("invalid center index")
 	}
-	c.CenterMarks[index] = !c.CenterMarks[index]
+	c.CenterMarks.toggle(index)
 }
 
 func (c *cellState) toggleColor(index int) {
-	c.ColorMask.toggle(index)
+	c.Colors.toggle(index)
 }
 
 func (c *cellState) clearCornerMarks() {
-	c.CornerMarks = [cellCount]bool{}
+	c.CornerMarks.clear()
 }
 
 func (c *cellState) clearCenterMarks() {
-	c.CenterMarks = [cellCount]bool{}
+	c.CenterMarks.clear()
 }
 
 func (c *cellState) clearNumber() {
@@ -53,105 +48,54 @@ func (c *cellState) isEmpty() bool {
 }
 
 func (c *cellState) hasCenterMarks() bool {
-	return slices.Contains(c.CenterMarks[:], true)
+	return !c.CenterMarks.isEmpty()
 }
 
 func (c *cellState) hasCornerMarks() bool {
-	return slices.Contains(c.CornerMarks[:], true)
+	return !c.CornerMarks.isEmpty()
 }
 
 func (c *cellState) containsCenterMarksOf(other cellState) bool {
-	for i, marked := range other.CenterMarks {
-		if marked && !c.CenterMarks[i] {
-			return false
-		}
-	}
-	return true
+	return c.CenterMarks.contains(other.CenterMarks)
 }
 
 func (c *cellState) containsCornerMarksOf(other cellState) bool {
-	for i, marked := range other.CornerMarks {
-		if marked && !c.CornerMarks[i] {
-			return false
-		}
-	}
-	return true
+	return c.CornerMarks.contains(other.CornerMarks)
 }
 
 func (c *cellState) isColored() bool {
-	return c.ColorMask.count() > 0
+	return c.Colors.count() > 0
 }
 
 func (c *cellState) colorCount() int {
-	return c.ColorMask.count()
+	return c.Colors.count()
 }
 
-func (c *cellState) hasAllColors(other bitMask) bool {
-	for i := range len(cellColors) {
-		if other.has(i) && !c.ColorMask.has(i) {
-			return false
-		}
-	}
-	return true
+func (c *cellState) hasAllColors(other cellState) bool {
+	return c.Colors.contains(other.Colors)
 }
 
 func (c *cellState) colorIndexes() []int {
-	return c.ColorMask.indexes()
+	return c.Colors.indexes()
 }
 
-type savedCellState struct {
-	Value      int     `json:"value"`
-	Given      bool    `json:"given,omitempty"`
-	CornerMask uint16  `json:"corner_marks,omitempty"`
-	CenterMask uint16  `json:"center_marks,omitempty"`
-	ColorMask  bitMask `json:"color_mask,omitempty"`
-}
+func (c *cellState) centerMarks() []int {
+	indexes := c.CenterMarks.indexes()
+	marks := make([]int, len(indexes))
 
-func (c cellState) MarshalJSON() ([]byte, error) {
-	return json.Marshal(savedCellState{
-		Value:      c.Value,
-		Given:      c.Given,
-		CornerMask: encodeMarks(c.CornerMarks),
-		CenterMask: encodeMarks(c.CenterMarks),
-		ColorMask:  c.ColorMask,
-	})
-}
-
-func (c *cellState) UnmarshalJSON(data []byte) error {
-	var saved savedCellState
-
-	if err := json.Unmarshal(data, &saved); err != nil {
-		return err
+	for i, index := range indexes {
+		marks[i] = index + 1
 	}
 
-	c.Value = saved.Value
-	c.Given = saved.Given
-	c.CornerMarks = decodeMarks(saved.CornerMask)
-	c.CenterMarks = decodeMarks(saved.CenterMask)
-	c.ColorMask = saved.ColorMask
-
-	return nil
+	return marks
 }
 
-func encodeMarks(marks [cellCount]bool) uint16 {
-	var mask uint16
+func (c *cellState) cornerMarks() []int {
+	indexes := c.CornerMarks.indexes()
+	marks := make([]int, len(indexes))
 
-	for i, marked := range marks {
-		if marked {
-			mask |= (1 << i)
-		}
-	}
-
-	return mask
-}
-
-func decodeMarks(mask uint16) [cellCount]bool {
-	var marks [cellCount]bool
-
-	for i := range cellCount {
-		if (mask & (1 << i)) > 0 {
-			marks[i] = true
-		}
+	for i, index := range indexes {
+		marks[i] = index + 1
 	}
 
 	return marks
