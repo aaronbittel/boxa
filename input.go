@@ -54,6 +54,7 @@ const (
 	KeyArrowRight
 	KeyArrowLeft
 
+	KeyR
 	KeyY
 	KeyZ
 
@@ -99,6 +100,8 @@ func (k Key) String() string {
 		return "KeyArrowLeft"
 	case KeyD:
 		return "KeyD"
+	case KeyR:
+		return "KeyR"
 	case KeyY:
 		return "KeyY"
 	case KeyZ:
@@ -289,6 +292,8 @@ func (*Input) keyEvent() (Event, bool) {
 		keyEvent.Key = KeyArrowLeft
 	case rl.IsKeyPressed(rl.KeyD):
 		keyEvent.Key = KeyD
+	case rl.IsKeyPressed(rl.KeyR):
+		keyEvent.Key = KeyR
 	case rl.IsKeyPressed(rl.KeyZ): // German keyboard: physical Z key is reported for Y
 		keyEvent.Key = KeyY
 	case rl.IsKeyPressed(rl.KeyY): // German keyboard: physical Y key is reported for Z
@@ -342,6 +347,11 @@ func handleEvent(event Event, gameState *gameState) {
 		case KeyD: // Debug
 			if event.Modifiers.Ctrl {
 				debug = !debug
+			}
+		case KeyR:
+			if event.Modifiers.Ctrl {
+				gameState.sudoku.reset()
+				gameState.undoHistory = undoHistory{}
 			}
 		case KeyY:
 			if event.Modifiers.Ctrl {

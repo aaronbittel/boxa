@@ -22,6 +22,21 @@ func (s *sudoku) isSolved() bool {
 	return true
 }
 
+func (s *sudoku) reset() {
+	for y := range cellCount {
+		for x := range cellCount {
+			if !s.at(x, y).Given {
+				s[y][x] = cellState{}
+			} else {
+				s[y][x] = cellState{
+					Value: s[y][x].Value,
+					Given: s[y][x].Given,
+				}
+			}
+		}
+	}
+}
+
 func (s *sudoku) set(pos Cell, state cellState) {
 	s[pos.Row][pos.Col] = state
 }
