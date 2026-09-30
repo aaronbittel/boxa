@@ -17,23 +17,6 @@ const (
 	EventKeyPressed
 )
 
-func (et EventType) String() string {
-	switch et {
-	case EventMousePressed:
-		return "MousePressed"
-	case EventMouseCellEntered:
-		return "MouseCellEntered"
-	case EventMouseReleased:
-		return "MouseReleased"
-	case EventMouseDoubleClick:
-		return "MouseDoubleClick"
-	case EventKeyPressed:
-		return "KeyPressed"
-	default:
-		panic("update EventType.String()")
-	}
-}
-
 type Key int
 
 const (
@@ -61,101 +44,20 @@ const (
 	KeyD // DebugKey
 )
 
-func (k Key) Value() int {
-	if k < KeyOne || k > KeyNine {
-		panic("key has no Sudoku value")
-	}
-	return int(k)
-}
+type moveDirection int
 
-func (k Key) String() string {
-	switch k {
-	case KeyOne:
-		return "KeyOne"
-	case KeyTwo:
-		return "KeyTwo"
-	case KeyThree:
-		return "KeyThree"
-	case KeyFour:
-		return "KeyFour"
-	case KeyFive:
-		return "KeyFive"
-	case KeySix:
-		return "KeySix"
-	case KeySeven:
-		return "KeySeven"
-	case KeyEight:
-		return "KeyEight"
-	case KeyNine:
-		return "KeyNine"
-	case KeyDelete:
-		return "KeyDelete"
-	case KeyArrowUp:
-		return "KeyArrowUp"
-	case KeyArrowDown:
-		return "KeyArrowDown"
-	case KeyArrowRight:
-		return "KeyArrowRight"
-	case KeyArrowLeft:
-		return "KeyArrowLeft"
-	case KeyD:
-		return "KeyD"
-	case KeyR:
-		return "KeyR"
-	case KeyY:
-		return "KeyY"
-	case KeyZ:
-		return "KeyZ"
-	default:
-		panic("new key was added")
-	}
-}
+const (
+	moveUp moveDirection = iota
+	moveDown
+	moveLeft
+	moveRight
+)
 
 const doubleClickTimeThreshold = 500 * time.Millisecond
 
 type Modifiers struct {
 	Ctrl  bool
 	Shift bool
-}
-
-type Cell struct {
-	Row int
-	Col int
-}
-
-func (c *Cell) move(moveDirection moveDirection) {
-	switch moveDirection {
-	case moveUp:
-		if c.Row == 0 {
-			c.Row = cellCount - 1
-		} else {
-			c.Row -= 1
-		}
-	case moveDown:
-		if c.Row == cellCount-1 {
-			c.Row = 0
-		} else {
-			c.Row += 1
-		}
-	case moveLeft:
-		if c.Col == 0 {
-			c.Col = cellCount - 1
-		} else {
-			c.Col -= 1
-		}
-	case moveRight:
-		if c.Col == cellCount-1 {
-			c.Col = 0
-		} else {
-			c.Col += 1
-		}
-	default:
-		panic("illegal key, expected arrow key")
-	}
-}
-
-func (c Cell) String() string {
-	return fmt.Sprintf("x=%d, y=%d", c.Col, c.Row)
 }
 
 type Event struct {
@@ -183,17 +85,6 @@ func (ms MouseState) isDoubleClick(currentCell Cell) bool {
 	return ms.LastClick.Active &&
 		currentCell == ms.LastClick.Cell &&
 		time.Since(ms.LastClick.When) < doubleClickTimeThreshold
-}
-
-func (e Event) String() string {
-	switch e.Type {
-	case EventMousePressed, EventMouseCellEntered, EventMouseReleased, EventMouseDoubleClick:
-		return fmt.Sprintf("%s(%s)", e.Type, e.Cell)
-	case EventKeyPressed:
-		return fmt.Sprintf("%s(%s)", e.Type, e.Key)
-	default:
-		panic("update EventType.String()")
-	}
 }
 
 func (i *Input) poll() []Event {
@@ -352,191 +243,44 @@ func (s selectionMode) String() string {
 	}
 }
 
-func handleEvent(event Event, gameState *gameState) {
-	switch event.Type {
-	case EventMousePressed:
-		handleSingleClick(event, gameState)
-	case EventMouseCellEntered:
-		handleDragging(event, gameState)
-	case EventMouseDoubleClick:
-		handleDoubleClick(event, gameState)
-	case EventKeyPressed:
-		switch event.Key {
-		case KeyOne, KeyTwo, KeyThree, KeyFour, KeyFive, KeySix, KeySeven, KeyEight, KeyNine:
-			handleNumberKey(event, gameState)
-		case KeyDelete:
-			handleDeleteKey(event, gameState)
-		case KeyArrowUp, KeyArrowDown, KeyArrowRight, KeyArrowLeft:
-			handleArrowKey(event, gameState)
-		case KeyD: // Debug
-			if event.Modifiers.Ctrl {
-				debug = !debug
-			}
-		case KeyR:
-			if event.Modifiers.Ctrl {
-				gameState.sudoku.reset()
-				gameState.undoHistory = &undoHistory{}
-			}
-		case KeyY:
-			if event.Modifiers.Ctrl {
-				gameState.undoHistory.redo(gameState.sudoku)
-			}
-		case KeyZ:
-			if event.Modifiers.Ctrl {
-				gameState.undoHistory.undo(gameState.sudoku)
-			}
+type Cell struct {
+	Row int
+	Col int
+}
+
+func (c *Cell) move(moveDirection moveDirection) {
+	switch moveDirection {
+	case moveUp:
+		if c.Row == 0 {
+			c.Row = cellCount - 1
+		} else {
+			c.Row -= 1
 		}
-	}
-}
-
-func handleDoubleClick(event Event, gameState *gameState) {
-	gameState.currentCell = event.Cell
-
-	if !event.Modifiers.Ctrl {
-		gameState.sudoku.unselectAllCells()
-	}
-
-	clickedCell := gameState.sudoku.at(event.Cell.Col, event.Cell.Row)
-	clickedCell.selected = true
-
-	gameState.sudoku.selectIf(func(candidate cellState) bool {
-		switch {
-		case clickedCell.isColored():
-			return candidate.hasAllColors(*clickedCell)
-		case !clickedCell.isEmpty():
-			return candidate.Value == clickedCell.Value
-		case clickedCell.hasCenterMarks():
-			return candidate.isEmpty() && candidate.containsCenterMarksOf(*clickedCell)
-		case clickedCell.hasCornerMarks():
-			return candidate.isEmpty() && candidate.containsCornerMarksOf(*clickedCell)
+	case moveDown:
+		if c.Row == cellCount-1 {
+			c.Row = 0
+		} else {
+			c.Row += 1
 		}
-		return false
-	})
-}
-
-func handleDragging(event Event, gameState *gameState) {
-	gameState.currentCell = event.Cell
-
-	switch gameState.selectionMode {
-	case selectionSelect:
-		gameState.sudoku.selectCell(event.Cell.Col, event.Cell.Row)
-	case selectionDeselect:
-		gameState.sudoku.deselectCell(event.Cell.Col, event.Cell.Row)
-	}
-}
-
-func handleSingleClick(event Event, gameState *gameState) {
-	gameState.currentCell = event.Cell
-
-	if !event.Modifiers.Ctrl {
-		gameState.selectionMode = selectionSelect
-		gameState.sudoku.unselectAllCells()
-		gameState.sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
-		gameState.selectionMode = selectionSelect
-		return
-	}
-
-	if gameState.sudoku.isSelected(event.Cell.Col, event.Cell.Row) {
-		gameState.selectionMode = selectionDeselect
-	} else {
-		gameState.selectionMode = selectionSelect
-	}
-	gameState.sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
-}
-
-func handleDeleteKey(event Event, gameState *gameState) {
-	gameState.undoHistory.begin()
-	defer gameState.undoHistory.commit()
-
-	switch {
-	case event.Modifiers.Ctrl && event.Modifiers.Shift:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			cell.Colors.clear()
-		})
-	case event.Modifiers.Shift:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			before := *cell
-			cell.clearCornerMarks()
-			gameState.undoHistory.record(pos, before, *cell)
-		})
-	case event.Modifiers.Ctrl:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			before := *cell
-			cell.clearCenterMarks()
-			gameState.undoHistory.record(pos, before, *cell)
-		})
+	case moveLeft:
+		if c.Col == 0 {
+			c.Col = cellCount - 1
+		} else {
+			c.Col -= 1
+		}
+	case moveRight:
+		if c.Col == cellCount-1 {
+			c.Col = 0
+		} else {
+			c.Col += 1
+		}
 	default:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			before := *cell
-			cell.clearNumber()
-			gameState.undoHistory.record(pos, before, *cell)
-		})
+		panic("illegal key, expected arrow key")
 	}
 }
 
-func handleArrowKey(event Event, gameState *gameState) {
-	moveDir, ok := arrowKeyDirection(event.Key)
-	if !ok {
-		return
-	}
-
-	gameState.currentCell.move(moveDir)
-
-	if !event.Modifiers.Ctrl && !event.Modifiers.Shift {
-		gameState.sudoku.unselectAllCells()
-		gameState.sudoku.selectCell(gameState.currentCell.Col, gameState.currentCell.Row)
-		return
-	}
-
-	switch gameState.selectionMode {
-	case selectionSelect:
-		gameState.sudoku.selectCell(gameState.currentCell.Col, gameState.currentCell.Row)
-	case selectionDeselect:
-		gameState.sudoku.deselectCell(gameState.currentCell.Col, gameState.currentCell.Row)
-	}
-}
-
-func handleNumberKey(event Event, gameState *gameState) {
-	value := event.Key.Value()
-	index := value - 1
-
-	gameState.undoHistory.begin()
-	defer gameState.undoHistory.commit()
-
-	switch {
-	case event.Modifiers.Ctrl && event.Modifiers.Shift:
-		if index < len(cellColors) {
-			gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-				before := *cell
-				cell.toggleColor(index)
-				gameState.undoHistory.record(pos, before, *cell)
-			})
-		}
-	case event.Modifiers.Shift:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			if cell.isEmpty() {
-				before := *cell
-				cell.toggleCornerMark(index)
-				gameState.undoHistory.record(pos, before, *cell)
-			}
-		})
-	case event.Modifiers.Ctrl:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			if cell.isEmpty() {
-				before := *cell
-				cell.toggleCenterMark(index)
-				gameState.undoHistory.record(pos, before, *cell)
-			}
-		})
-	default:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
-			if !cell.Given {
-				before := *cell
-				cell.Value = value
-				gameState.undoHistory.record(pos, before, *cell)
-			}
-		})
-	}
+func (c Cell) String() string {
+	return fmt.Sprintf("x=%d, y=%d", c.Col, c.Row)
 }
 
 func positionToCellIdx(pos rl.Vector2) (x, y int) {
@@ -575,11 +319,80 @@ func arrowKeyDirection(key Key) (moveDirection, bool) {
 	}
 }
 
-type moveDirection int
+func (e Event) String() string {
+	switch e.Type {
+	case EventMousePressed, EventMouseCellEntered, EventMouseReleased, EventMouseDoubleClick:
+		return fmt.Sprintf("%s(%s)", e.Type, e.Cell)
+	case EventKeyPressed:
+		return fmt.Sprintf("%s(%s)", e.Type, e.Key)
+	default:
+		panic("update EventType.String()")
+	}
+}
 
-const (
-	moveUp moveDirection = iota
-	moveDown
-	moveLeft
-	moveRight
-)
+func (k Key) Value() int {
+	if k < KeyOne || k > KeyNine {
+		panic("key has no Sudoku value")
+	}
+	return int(k)
+}
+
+func (k Key) String() string {
+	switch k {
+	case KeyOne:
+		return "KeyOne"
+	case KeyTwo:
+		return "KeyTwo"
+	case KeyThree:
+		return "KeyThree"
+	case KeyFour:
+		return "KeyFour"
+	case KeyFive:
+		return "KeyFive"
+	case KeySix:
+		return "KeySix"
+	case KeySeven:
+		return "KeySeven"
+	case KeyEight:
+		return "KeyEight"
+	case KeyNine:
+		return "KeyNine"
+	case KeyDelete:
+		return "KeyDelete"
+	case KeyArrowUp:
+		return "KeyArrowUp"
+	case KeyArrowDown:
+		return "KeyArrowDown"
+	case KeyArrowRight:
+		return "KeyArrowRight"
+	case KeyArrowLeft:
+		return "KeyArrowLeft"
+	case KeyD:
+		return "KeyD"
+	case KeyR:
+		return "KeyR"
+	case KeyY:
+		return "KeyY"
+	case KeyZ:
+		return "KeyZ"
+	default:
+		panic("new key was added")
+	}
+}
+
+func (e EventType) String() string {
+	switch e {
+	case EventMousePressed:
+		return "MousePressed"
+	case EventMouseCellEntered:
+		return "MouseCellEntered"
+	case EventMouseReleased:
+		return "MouseReleased"
+	case EventMouseDoubleClick:
+		return "MouseDoubleClick"
+	case EventKeyPressed:
+		return "KeyPressed"
+	default:
+		panic("update EventType.String()")
+	}
+}
