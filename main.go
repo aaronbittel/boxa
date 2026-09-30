@@ -65,19 +65,19 @@ func main() {
 		}
 
 		rl.BeginDrawing()
-		rl.ClearBackground(rl.RayWhite)
+		rl.ClearBackground(backgroundColor)
 
 		drawCellBackground(*game.sudoku)
 		drawConflictingCells(*game.sudoku)
 		drawSelectedBorders(*game.sudoku)
 		drawSudoku(*game.sudoku, font)
 
-		borderColor := rl.Black
+		bgColor := borderColor
 		if game.sudokuIsSolved {
-			borderColor = rl.Green
+			bgColor = solvedSudokuBorderColor
 		}
 
-		drawGrid(borderColor)
+		drawGrid(bgColor)
 		if game.sudokuIsSolved {
 			drawSudokuSolvedScreen(duration, font)
 		}

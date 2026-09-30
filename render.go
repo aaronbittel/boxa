@@ -24,11 +24,16 @@ const (
 )
 
 var (
-	defaultColor            = rl.Blue
-	highlightColor          = rl.NewColor(0x4C, 0xA4, 0xFF, 0xFF)
-	conflictCellColor       = rl.NewColor(0xD9, 0x9C, 0x9C, 0xFF)
-	conflictPencilMarkColor = rl.NewColor(0xBB, 0x4E, 0x4E, 0xFF)
-	conflictBorderColor     = rl.NewColor(0x80, 0x6F, 0x9C, 0xFF)
+	backgroundColor             = rl.RayWhite
+	numberColor                 = rl.Blue
+	borderColor                 = rl.Black
+	givenNumberColor            = rl.Black
+	highlightColor              = rl.NewColor(0x4C, 0xA4, 0xFF, 0xFF)
+	solvedSudokuBorderColor     = rl.Green
+	conflictCellColor           = rl.NewColor(0xD9, 0x9C, 0x9C, 0xFF)
+	conflictPencilMarkColor     = rl.NewColor(0xBB, 0x4E, 0x4E, 0xFF)
+	conflictBorderColor         = rl.NewColor(0x80, 0x6F, 0x9C, 0xFF)
+	solvedScreenBackgroundColor = rl.NewColor(0xE8, 0xE6, 0xE1, 0xFF)
 )
 
 var pencilMarkCornerOffsets = [cellCount]rl.Vector2{
@@ -53,7 +58,7 @@ var cellColors = []color.RGBA{
 	rl.NewColor(0xB8, 0xE3, 0xD3, 0xFF),
 	rl.NewColor(0xC5, 0xB9, 0xE8, 0xFF),
 	rl.NewColor(0xF5, 0xC6, 0xD8, 0xFF),
-	rl.RayWhite,
+	backgroundColor,
 }
 
 func drawGrid(borderColor color.RGBA) {
@@ -68,7 +73,7 @@ func drawGrid(borderColor color.RGBA) {
 		if y%3 == 0 {
 			t = borderThickness
 		}
-		rl.DrawLineEx(start, end, t, rl.Black)
+		rl.DrawLineEx(start, end, t, borderColor)
 	}
 
 	for x := 1; x < cellCount; x++ {
@@ -79,7 +84,7 @@ func drawGrid(borderColor color.RGBA) {
 		if x%3 == 0 {
 			t = borderThickness
 		}
-		rl.DrawLineEx(start, end, t, rl.Black)
+		rl.DrawLineEx(start, end, t, borderColor)
 	}
 
 }
@@ -112,9 +117,9 @@ func drawSudokuSolvedScreen(duration time.Duration, font rl.Font) {
 		Y: bg.Y + bg.Height*0.5,
 	}
 
-	rl.DrawRectangleRounded(bg, 0.4, 32, rl.NewColor(0xE8, 0xE6, 0xE1, 0xFF))
-	rl.DrawTextEx(font, congratsText, congratsTextPos, textFontSize, spacing, rl.Green)
-	rl.DrawTextEx(font, timeText, timeTextPos, textFontSize, spacing, rl.Green)
+	rl.DrawRectangleRounded(bg, 0.4, 32, solvedSudokuBorderColor)
+	rl.DrawTextEx(font, congratsText, congratsTextPos, textFontSize, spacing, solvedSudokuBorderColor)
+	rl.DrawTextEx(font, timeText, timeTextPos, textFontSize, spacing, solvedSudokuBorderColor)
 }
 
 func drawSudoku(s sudoku, font rl.Font) {
@@ -371,9 +376,9 @@ func drawCellNumber(s sudoku, x, y int, font rl.Font) {
 		Y: cellY + 14.0,
 	}
 
-	color := defaultColor
+	color := numberColor
 	if s.at(x, y).Given {
-		color = rl.Black
+		color = givenNumberColor
 	}
 	rl.DrawTextEx(font, text, pos, cellNumberFontSize, 0.0, color)
 }
@@ -400,7 +405,7 @@ func drawCornerMarks(s sudoku, x, y int, font rl.Font) {
 			Y: markY,
 		}
 
-		color := defaultColor
+		color := numberColor
 		if s.hasConflictFor(x, y, num) {
 			color = conflictPencilMarkColor
 		}
@@ -436,7 +441,7 @@ func drawCenterMarks(s sudoku, x, y int, font rl.Font) {
 	}
 
 	for _, num := range s.at(x, y).centerMarks() {
-		color := defaultColor
+		color := numberColor
 		if s.hasConflictFor(x, y, num) {
 			color = conflictPencilMarkColor
 		}
@@ -506,7 +511,7 @@ func drawSelectedCell(y, x int) {
 		Width:  cellSize,
 		Height: cellSize,
 	}
-	rl.DrawRectangleLinesEx(rec, borderThickness, defaultColor)
+	rl.DrawRectangleLinesEx(rec, borderThickness, numberColor)
 }
 
 func drawConflictingCells(s sudoku) {
