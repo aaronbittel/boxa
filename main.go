@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,6 +12,9 @@ import (
 	"github.com/aaronbittel/boxa/fetch"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
+
+//go:embed fonts/DejaVuSans.ttf
+var fontBytes []byte
 
 type gameState struct {
 	id             string
@@ -37,7 +41,7 @@ func main() {
 	rl.InitWindow(windowWidth, windowHeight, "Boxa")
 	defer rl.CloseWindow()
 
-	font := rl.LoadFontEx("./fonts/DejaVuSans.ttf", int32(textFontSize), nil, 0)
+	font := rl.LoadFontFromMemory(".ttf", fontBytes, int32(textFontSize), nil)
 	defer rl.UnloadFont(font)
 
 	var input Input
