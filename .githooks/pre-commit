@@ -3,7 +3,7 @@
 set -e
 
 echo "==> gofmt"
-if [ -n "$(gofmt -l .)" ]; then
+if [ -n "$(gofmt -l $(find . -path './vendor' -prune -o -name '*.go' -print))" ]; then
     echo "Files need formatting:"
     gofmt -l .
     exit 1

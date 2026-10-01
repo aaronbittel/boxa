@@ -38,6 +38,7 @@ const (
 	KeyArrowLeft
 
 	KeyR
+	KeyV
 	KeyY
 	KeyZ
 
@@ -209,6 +210,8 @@ func (*Input) keyEvent() (Event, bool) {
 		keyEvent.Key = KeyArrowLeft
 	case rl.IsKeyPressed(rl.KeyD):
 		keyEvent.Key = KeyD
+	case rl.IsKeyPressed(rl.KeyV):
+		keyEvent.Key = KeyV
 	case rl.IsKeyPressed(rl.KeyR):
 		keyEvent.Key = KeyR
 	case rl.IsKeyPressed(rl.KeyZ): // German keyboard: physical Z key is reported for Y
@@ -369,6 +372,8 @@ func (k Key) String() string {
 		return "KeyArrowLeft"
 	case KeyD:
 		return "KeyD"
+	case KeyV:
+		return "KeyV"
 	case KeyR:
 		return "KeyR"
 	case KeyY:

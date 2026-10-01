@@ -2,7 +2,10 @@ module github.com/aaronbittel/boxa
 
 go 1.26.4
 
-require github.com/gen2brain/raylib-go/raylib v0.60.1
+require (
+	github.com/atotto/clipboard v0.1.4
+	github.com/gen2brain/raylib-go/raylib v0.60.1
+)
 
 require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect

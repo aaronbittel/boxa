@@ -59,7 +59,13 @@ func main() {
 				if debug {
 					fmt.Println("event", event, "selectionMode", game.selectionMode)
 				}
-				handleEvent(event, game)
+				newGameState, err := handleEvent(event, game)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "WARNING: %s", err)
+					continue
+				}
+				game = newGameState
+
 				if game.sudoku.isSolved() {
 					game.sudokuIsSolved = true
 					duration = game.elapsed + time.Since(start)

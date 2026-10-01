@@ -1,40 +1,63 @@
 package main
 
-func handleEvent(event Event, gameState *gameState) {
+import (
+	"fmt"
+	"strings"
+
+	"github.com/atotto/clipboard"
+)
+
+func handleEvent(event Event, game *gameState) (*gameState, error) {
 	switch event.Type {
 	case EventMousePressed:
-		handleSingleClick(event, gameState)
+		handleSingleClick(event, game)
 	case EventMouseCellEntered:
-		handleDragging(event, gameState)
+		handleDragging(event, game)
 	case EventMouseDoubleClick:
-		handleDoubleClick(event, gameState)
+		handleDoubleClick(event, game)
 	case EventKeyPressed:
-		switch event.Key {
-		case KeyOne, KeyTwo, KeyThree, KeyFour, KeyFive, KeySix, KeySeven, KeyEight, KeyNine:
-			handleNumberKey(event, gameState)
-		case KeyDelete:
-			handleDeleteKey(event, gameState)
-		case KeyArrowUp, KeyArrowDown, KeyArrowRight, KeyArrowLeft:
-			handleArrowKey(event, gameState)
-		case KeyD: // Debug
-			if event.Modifiers.Ctrl {
-				debug = !debug
+		return handleKeyEvent(event, game)
+	}
+
+	return game, nil
+}
+
+func handleKeyEvent(event Event, game *gameState) (*gameState, error) {
+	switch event.Key {
+	case KeyOne, KeyTwo, KeyThree, KeyFour, KeyFive, KeySix, KeySeven, KeyEight, KeyNine:
+		handleNumberKey(event, game)
+	case KeyDelete:
+		handleDeleteKey(event, game)
+	case KeyArrowUp, KeyArrowDown, KeyArrowRight, KeyArrowLeft:
+		handleArrowKey(event, game)
+	case KeyD: // Debug
+		if event.Modifiers.Ctrl {
+			debug = !debug
+		}
+	case KeyV:
+		if event.Modifiers.Ctrl {
+			newGameState, err := pasteSudoku()
+			if err != nil {
+				return nil, err
 			}
-		case KeyR:
-			if event.Modifiers.Ctrl {
-				gameState.sudoku.reset()
-				gameState.undoHistory = &undoHistory{}
-			}
-		case KeyY:
-			if event.Modifiers.Ctrl {
-				gameState.undoHistory.redo(gameState.sudoku)
-			}
-		case KeyZ:
-			if event.Modifiers.Ctrl {
-				gameState.undoHistory.undo(gameState.sudoku)
-			}
+			return newGameState, nil
+		}
+	case KeyR:
+		if event.Modifiers.Ctrl {
+			game.sudoku.reset()
+			game.undoHistory = &undoHistory{}
+		}
+	case KeyY:
+		if event.Modifiers.Ctrl {
+			game.undoHistory.redo(game.sudoku)
+		}
+	case KeyZ:
+		if event.Modifiers.Ctrl {
+			game.undoHistory.undo(game.sudoku)
 		}
 	}
+
+	return game, nil
 }
 
 func handleDoubleClick(event Event, gameState *gameState) {
@@ -185,4 +208,20 @@ func handleNumberKey(event Event, gameState *gameState) {
 			}
 		})
 	}
+}
+
+func pasteSudoku() (*gameState, error) {
+	id, err := clipboard.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("WARNING: pasting of clipboard content failed: %w", err)
+	}
+
+	id = strings.TrimSpace(id)
+
+	newGameState, err := loadGameState(id)
+	if err != nil {
+		return nil, fmt.Errorf("WARNING: loading of sudoku with id %q failed: %w", id, err)
+	}
+
+	return newGameState, nil
 }
