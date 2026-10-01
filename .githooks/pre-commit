@@ -9,13 +9,26 @@ if [ -n "$(gofmt -l .)" ]; then
     exit 1
 fi
 
+echo "==> go mod tidy"
+go mod tidy
+
+echo "==> go mod vendor"
+go mod vendor
+
+if ! git diff --quiet; then
+    echo "Generated dependency files are out of date:"
+    git diff --stat
+    git diff
+    exit 1
+fi
+
 echo "==> go vet"
-go vet ./...
+go vet -mod=vendor ./...
 
 echo "==> staticcheck"
 go tool staticcheck ./...
 
 echo "==> go test"
-go test ./...
+go test -mod=vendor ./...
 
 echo "All checks passed."
