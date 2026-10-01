@@ -21,6 +21,8 @@ const (
 
 	cellNumberFontSize float32 = cellSize * 0.7
 	textFontSize       float32 = 64.0
+
+	conflictTint = 0.35
 )
 
 var (
@@ -331,37 +333,66 @@ func drawCellBackground(s sudoku) {
 	for y := range cellCount {
 		for x := range cellCount {
 			cell := s.at(x, y)
+			conflict := s.hasCellConflict(x, y)
 
-			if !cell.isColored() {
-				continue
-			}
-
-			layout, ok := cellRegionsOffsets[cell.colorCount()]
-			if !ok {
-				continue
-			}
-
-			cellPos := rl.Vector2{
-				X: float32(x * cellSize),
-				Y: float32(y * cellSize),
-			}
-
-			indexes := cell.colorIndexes()
-
-			if len(layout) != len(indexes) {
-				panic("cell color layout and color index count mismatch")
-			}
-
-			for i, region := range layout {
-				color := cellColors[indexes[i]]
-				for _, triangle := range region {
-					v1 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[0], float32(cellSize)))
-					v2 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[1], float32(cellSize)))
-					v3 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[2], float32(cellSize)))
-					drawTriangleCCW(v1, v2, v3, color)
-				}
+			switch {
+			case cell.isColored() && conflict:
+				drawColoredCellBackground(cell, x, y, conflictTint)
+			case cell.isColored():
+				drawColoredCellBackground(cell, x, y, 0)
+			case conflict:
+				drawConflictCellBackground(x, y)
+			default:
+				// Nothing to draw.
 			}
 		}
+	}
+}
+
+func drawColoredCellBackground(cell *cellState, x, y int, tint float32) {
+	layout, ok := cellRegionsOffsets[cell.colorCount()]
+	if !ok {
+		return
+	}
+
+	cellPos := rl.Vector2{
+		X: float32(x * cellSize),
+		Y: float32(y * cellSize),
+	}
+
+	indexes := cell.colorIndexes()
+
+	if len(layout) != len(indexes) {
+		panic("cell color layout and color index count mismatch")
+	}
+
+	for i, region := range layout {
+		color := cellColors[indexes[i]]
+
+		if tint > 0 {
+			color = tintTowardsRed(color, tint)
+		}
+
+		for _, triangle := range region {
+			v1 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[0], float32(cellSize)))
+			v2 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[1], float32(cellSize)))
+			v3 := rl.Vector2Add(cellPos, rl.Vector2Scale(triangle[2], float32(cellSize)))
+
+			drawTriangleCCW(v1, v2, v3, color)
+		}
+	}
+}
+
+func drawConflictCellBackground(x, y int) {
+	rl.DrawRectangle(int32(x*cellSize), int32(y*cellSize), cellSize, cellSize, conflictCellColor)
+}
+
+func tintTowardsRed(c rl.Color, amount float32) rl.Color {
+	return rl.Color{
+		R: uint8(float32(c.R) + (255-float32(c.R))*amount),
+		G: uint8(float32(c.G) * (1 - amount)),
+		B: uint8(float32(c.B) * (1 - amount)),
+		A: c.A,
 	}
 }
 
@@ -493,18 +524,6 @@ func drawSelectedBorders(s sudoku) {
 			if y > 0 && x > 0 && s.at(x-1, y).selected && s.at(x, y-1).selected && !s.at(x-1, y-1).selected {
 				center := rl.Vector2{X: float32(cellX), Y: float32(cellY)}
 				rl.DrawCircleSector(center, highlightThickness, 0.0, 90.0, 16, color)
-			}
-		}
-	}
-}
-
-func drawConflictingCells(s sudoku) {
-	for y := range cellCount {
-		for x := range cellCount {
-			if s.hasCellConflict(x, y) {
-				cellX := int32(x * cellSize)
-				cellY := int32(y * cellSize)
-				rl.DrawRectangle(cellX, cellY, cellSize, cellSize, conflictCellColor)
 			}
 		}
 	}

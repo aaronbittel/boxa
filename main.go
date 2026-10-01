@@ -78,7 +78,6 @@ func main() {
 		rl.ClearBackground(backgroundColor)
 
 		drawCellBackground(*game.sudoku)
-		drawConflictingCells(*game.sudoku)
 		drawSelectedBorders(*game.sudoku)
 		drawSudoku(*game.sudoku, font)
 

@@ -73,7 +73,7 @@ func (c *cellState) containsCornerMarksOf(other cellState) bool {
 }
 
 func (c *cellState) isColored() bool {
-	return c.Colors.count() > 0
+	return !c.Colors.isEmpty()
 }
 
 func (c *cellState) colorCount() int {
