@@ -123,7 +123,7 @@ func drawSudokuSolvedScreen(duration time.Duration, font rl.Font) {
 
 	rl.DrawRectangleRounded(bg, 0.4, 32, solvedBorderColor)
 	rl.DrawTextEx(font, congratsText, congratsTextPos, textFontSize, spacing, solvedScreenBackgroundColor)
-	rl.DrawTextEx(font, timeText, timeTextPos, textFontSize, spacing, solvedBorderColor)
+	rl.DrawTextEx(font, timeText, timeTextPos, textFontSize, spacing, solvedScreenBackgroundColor)
 }
 
 func drawSudoku(s sudoku, font rl.Font) {
