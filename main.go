@@ -13,7 +13,7 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-//go:embed fonts/DejaVuSans.ttf
+//go:embed assets/fonts/DejaVuSans.ttf
 var fontBytes []byte
 
 var debug = false
@@ -30,6 +30,8 @@ func main() {
 
 	rl.InitWindow(windowWidth, windowHeight, "Boxa")
 	defer rl.CloseWindow()
+
+	rl.SetMouseCursor(rl.MouseCursorPointingHand)
 
 	font := rl.LoadFontFromMemory(".ttf", fontBytes, int32(textFontSize), nil)
 	defer rl.UnloadFont(font)

@@ -5,6 +5,8 @@ A small Sudoku solving pad for the desktop, inspired by
 
 **[Download the latest release](https://github.com/aaronbittel/boxa/releases/latest)**
 
+![Boxa demo](assets/demo.png)
+
 Boxa takes a SudokuPad puzzle ID, downloads the puzzle, and lets you solve it locally.
 
 ## Usage
