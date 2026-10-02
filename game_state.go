@@ -46,27 +46,25 @@ func (g *gameState) updateSolver() {
 	if !g.solver.started {
 		g.solver.started = true
 		go func() {
-			g.solver.done <- sudokuSolveBacktracking(*g.sudoku, Cell{}, g.solver.changes)
+			g.solver.solved <- g.solver.algorithm(*g.sudoku, g.solver.steps)
+			close(g.solver.steps)
 		}()
 	}
 	select {
-	case change, ok := <-g.solver.changes:
-		if !ok {
-			g.solver.changes = nil
-			break
-		}
+	case step, ok := <-g.solver.steps:
 		g.sudoku.deselectAllCells()
-		g.sudoku.set(change.pos, cellState{
-			selected: change.selected,
-			Value:    change.value,
-		})
-	case solved := <-g.solver.done:
-		if solved {
-			g.mode = modeSolved
-		} else {
-			g.mode = modeUnsolveable
+		if !ok {
+			if <-g.solver.solved {
+				g.mode = modeSolved
+			} else {
+				g.mode = modeUnsolveable
+			}
+			return
 		}
-		g.solver.done = nil
+		g.sudoku.set(step.pos, cellState{
+			selected: step.selected,
+			Value:    step.value,
+		})
 	default: // continue
 	}
 }

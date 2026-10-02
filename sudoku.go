@@ -129,6 +129,18 @@ func (s *sudoku) forEachSelectedCell(fn func(pos Cell, cell *cellState)) {
 	}
 }
 
+func (s *sudoku) candidates(x, y int) []int {
+	var nums []int
+
+	for num := 1; num <= cellCount; num++ {
+		if !s.hasConflictFor(x, y, num) {
+			nums = append(nums, num)
+		}
+	}
+
+	return nums
+}
+
 func (s *sudoku) selectCell(x, y int) {
 	s[y][x].selected = true
 }

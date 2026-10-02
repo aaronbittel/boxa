@@ -30,6 +30,11 @@ func (g *gameState) handleKeyEvent(event Event) error {
 		g.handleDeleteKey(event)
 	case KeyArrowUp, KeyArrowDown, KeyArrowRight, KeyArrowLeft:
 		g.handleArrowKey(event)
+	case KeyB:
+		if event.Modifiers.Ctrl {
+			g.mode = modeSolving
+			g.solver.algorithm = sudokuSolveBacktracking
+		}
 	case KeyD: // Debug
 		if event.Modifiers.Ctrl {
 			debug = !debug
@@ -37,6 +42,7 @@ func (g *gameState) handleKeyEvent(event Event) error {
 	case KeyS:
 		if event.Modifiers.Ctrl {
 			g.mode = modeSolving
+			g.solver.algorithm = sudokuSolveBacktrackingMRV
 		}
 	case KeyR:
 		if event.Modifiers.Ctrl {

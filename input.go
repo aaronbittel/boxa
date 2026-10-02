@@ -37,6 +37,7 @@ const (
 	KeyArrowRight
 	KeyArrowLeft
 
+	KeyB
 	KeyS
 	KeyR
 	KeyV
@@ -209,6 +210,8 @@ func (*Input) keyEvent() (Event, bool) {
 		keyEvent.Key = KeyArrowRight
 	case rl.IsKeyPressed(rl.KeyLeft):
 		keyEvent.Key = KeyArrowLeft
+	case rl.IsKeyPressed(rl.KeyB):
+		keyEvent.Key = KeyB
 	case rl.IsKeyPressed(rl.KeyD):
 		keyEvent.Key = KeyD
 	case rl.IsKeyPressed(rl.KeyS):
@@ -386,6 +389,8 @@ func (k Key) String() string {
 		return "KeyArrowRight"
 	case KeyArrowLeft:
 		return "KeyArrowLeft"
+	case KeyB:
+		return "KeyB"
 	case KeyD:
 		return "KeyD"
 	case KeyS:
