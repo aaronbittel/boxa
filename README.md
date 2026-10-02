@@ -50,7 +50,8 @@ same puzzle ID.
 | `Ctrl` + `Y`                    | Redo                             |
 | `Ctrl` + `R`                    | Reset the Sudoku                 |
 | `Ctrl` + `V`                    | Load a Sudoku from the clipboard |
-| `Ctrl` + `S`                    | Solve the Sudoku                 |
+| `Ctrl` + `S`                    | Solve using MRV backtracking     |
+| `Ctrl` + `B`                    | Solve using backtracking         |
 
 ### Mouse
 
