@@ -146,7 +146,9 @@ func (g *gameState) handleDeleteKey(event Event) {
 	switch {
 	case event.Modifiers.Ctrl && event.Modifiers.Shift:
 		g.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			before := *cell
 			cell.Colors.clear()
+			g.undoHistory.record(pos, before, *cell)
 		})
 	case event.Modifiers.Shift:
 		g.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
