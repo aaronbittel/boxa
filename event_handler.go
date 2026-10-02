@@ -60,6 +60,19 @@ func handleKeyEvent(event Event, game *gameState) (*gameState, error) {
 	return game, nil
 }
 
+// Selection precedence:
+//  1. Modifier-specific selection is attempted first:
+//     - Ctrl + Shift: coloring
+//     - Ctrl:         center marks
+//     - Shift:        corner marks
+//  2. If the requested modifier-specific property is not present,
+//     selection falls back to the normal priority:
+//     - number
+//     - coloring
+//     - center marks
+//     - corner marks
+//
+// The first matching rule wins.
 func handleDoubleClick(event Event, gameState *gameState) {
 	gameState.currentCell = event.Cell
 
@@ -72,14 +85,23 @@ func handleDoubleClick(event Event, gameState *gameState) {
 
 	gameState.sudoku.selectIf(func(candidate cellState) bool {
 		switch {
-		case clickedCell.isColored():
+		case event.Modifiers.Ctrl && event.Modifiers.Shift && clickedCell.isColored():
 			return candidate.hasAllColors(*clickedCell)
-		case !clickedCell.isEmpty():
-			return candidate.Value == clickedCell.Value
-		case clickedCell.hasCenterMarks():
+		case event.Modifiers.Ctrl && clickedCell.hasCenterMarks():
 			return candidate.isEmpty() && candidate.containsCenterMarksOf(*clickedCell)
-		case clickedCell.hasCornerMarks():
+		case event.Modifiers.Shift && clickedCell.hasCornerMarks():
 			return candidate.isEmpty() && candidate.containsCornerMarksOf(*clickedCell)
+		default:
+			switch {
+			case !clickedCell.isEmpty():
+				return candidate.Value == clickedCell.Value
+			case clickedCell.isColored():
+				return candidate.hasAllColors(*clickedCell)
+			case clickedCell.hasCenterMarks():
+				return candidate.isEmpty() && candidate.containsCenterMarksOf(*clickedCell)
+			case clickedCell.hasCornerMarks():
+				return candidate.isEmpty() && candidate.containsCornerMarksOf(*clickedCell)
+			}
 		}
 		return false
 	})
