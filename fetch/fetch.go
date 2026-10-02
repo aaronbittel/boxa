@@ -38,9 +38,13 @@ func FetchSudoku(id string) (boardData, error) {
 	}
 	defer resp.Body.Close()
 
+	if err := checkResponse(resp); err != nil {
+		return boardData{}, fmt.Errorf("fetch metadata: %w", err)
+	}
+
 	var m metadata
 	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
-		return boardData{}, err
+		return boardData{}, fmt.Errorf("decode metadata: %w", err)
 	}
 
 	dataUrl, err := url.Parse(metadataUrl)
@@ -59,10 +63,21 @@ func FetchSudoku(id string) (boardData, error) {
 	}
 	defer resp.Body.Close()
 
+	if err := checkResponse(resp); err != nil {
+		return boardData{}, fmt.Errorf("fetch board data: %w", err)
+	}
+
 	var data boardData
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return boardData{}, err
+		return boardData{}, fmt.Errorf("decode board data: %w", err)
 	}
 
 	return data, nil
+}
+
+func checkResponse(resp *http.Response) error {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("HTTP %s", resp.Status)
+	}
+	return nil
 }

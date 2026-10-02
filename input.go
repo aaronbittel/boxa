@@ -37,6 +37,7 @@ const (
 	KeyArrowRight
 	KeyArrowLeft
 
+	KeyS
 	KeyR
 	KeyV
 	KeyY
@@ -210,6 +211,8 @@ func (*Input) keyEvent() (Event, bool) {
 		keyEvent.Key = KeyArrowLeft
 	case rl.IsKeyPressed(rl.KeyD):
 		keyEvent.Key = KeyD
+	case rl.IsKeyPressed(rl.KeyS):
+		keyEvent.Key = KeyS
 	case rl.IsKeyPressed(rl.KeyV):
 		keyEvent.Key = KeyV
 	case rl.IsKeyPressed(rl.KeyR):
@@ -249,6 +252,19 @@ func (s selectionMode) String() string {
 type Cell struct {
 	Row int
 	Col int
+}
+
+func (c Cell) next() Cell {
+	n := Cell{
+		Row: c.Row,
+		Col: c.Col,
+	}
+	n.Col++
+	if n.Col >= cellCount {
+		n.Col = 0
+		n.Row++
+	}
+	return n
 }
 
 func (c *Cell) move(moveDirection moveDirection) {
@@ -372,6 +388,8 @@ func (k Key) String() string {
 		return "KeyArrowLeft"
 	case KeyD:
 		return "KeyD"
+	case KeyS:
+		return "KeyS"
 	case KeyV:
 		return "KeyV"
 	case KeyR:

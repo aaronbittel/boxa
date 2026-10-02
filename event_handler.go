@@ -7,57 +7,53 @@ import (
 	"github.com/atotto/clipboard"
 )
 
-func handleEvent(event Event, game *gameState) (*gameState, error) {
+func (g *gameState) handlePlayingEvent(event Event) error {
 	switch event.Type {
 	case EventMousePressed:
-		handleSingleClick(event, game)
+		g.handleSingleClick(event)
 	case EventMouseCellEntered:
-		handleDragging(event, game)
+		g.handleDragging(event)
 	case EventMouseDoubleClick:
-		handleDoubleClick(event, game)
+		g.handleDoubleClick(event)
 	case EventKeyPressed:
-		return handleKeyEvent(event, game)
+		return g.handleKeyEvent(event)
 	}
 
-	return game, nil
+	return nil
 }
 
-func handleKeyEvent(event Event, game *gameState) (*gameState, error) {
+func (g *gameState) handleKeyEvent(event Event) error {
 	switch event.Key {
 	case KeyOne, KeyTwo, KeyThree, KeyFour, KeyFive, KeySix, KeySeven, KeyEight, KeyNine:
-		handleNumberKey(event, game)
+		g.handleNumberKey(event)
 	case KeyDelete:
-		handleDeleteKey(event, game)
+		g.handleDeleteKey(event)
 	case KeyArrowUp, KeyArrowDown, KeyArrowRight, KeyArrowLeft:
-		handleArrowKey(event, game)
+		g.handleArrowKey(event)
 	case KeyD: // Debug
 		if event.Modifiers.Ctrl {
 			debug = !debug
 		}
-	case KeyV:
+	case KeyS:
 		if event.Modifiers.Ctrl {
-			newGameState, err := pasteSudoku()
-			if err != nil {
-				return nil, err
-			}
-			return newGameState, nil
+			g.mode = modeSolving
 		}
 	case KeyR:
 		if event.Modifiers.Ctrl {
-			game.sudoku.reset()
-			game.undoHistory = &undoHistory{}
+			g.sudoku.reset()
+			g.undoHistory = &undoHistory{}
 		}
 	case KeyY:
 		if event.Modifiers.Ctrl {
-			game.undoHistory.redo(game.sudoku)
+			g.undoHistory.redo(g.sudoku)
 		}
 	case KeyZ:
 		if event.Modifiers.Ctrl {
-			game.undoHistory.undo(game.sudoku)
+			g.undoHistory.undo(g.sudoku)
 		}
 	}
 
-	return game, nil
+	return nil
 }
 
 // Selection precedence:
@@ -73,17 +69,17 @@ func handleKeyEvent(event Event, game *gameState) (*gameState, error) {
 //     - corner marks
 //
 // The first matching rule wins.
-func handleDoubleClick(event Event, gameState *gameState) {
-	gameState.currentCell = event.Cell
+func (g *gameState) handleDoubleClick(event Event) {
+	g.currentCell = event.Cell
 
 	if !event.Modifiers.Ctrl {
-		gameState.sudoku.unselectAllCells()
+		g.sudoku.deselectAllCells()
 	}
 
-	clickedCell := gameState.sudoku.at(event.Cell.Col, event.Cell.Row)
+	clickedCell := g.sudoku.at(event.Cell.Col, event.Cell.Row)
 	clickedCell.selected = true
 
-	gameState.sudoku.selectIf(func(candidate cellState) bool {
+	g.sudoku.selectIf(func(candidate cellState) bool {
 		switch {
 		case event.Modifiers.Ctrl && event.Modifiers.Shift && clickedCell.isColored():
 			return candidate.hasAllColors(*clickedCell)
@@ -107,142 +103,142 @@ func handleDoubleClick(event Event, gameState *gameState) {
 	})
 }
 
-func handleDragging(event Event, gameState *gameState) {
-	gameState.currentCell = event.Cell
+func (g *gameState) handleDragging(event Event) {
+	g.currentCell = event.Cell
 
-	switch gameState.selectionMode {
+	switch g.selectionMode {
 	case selectionSelect:
-		gameState.sudoku.selectCell(event.Cell.Col, event.Cell.Row)
+		g.sudoku.selectCell(event.Cell.Col, event.Cell.Row)
 	case selectionDeselect:
-		gameState.sudoku.deselectCell(event.Cell.Col, event.Cell.Row)
+		g.sudoku.deselectCell(event.Cell.Col, event.Cell.Row)
 	}
 }
 
-func handleSingleClick(event Event, gameState *gameState) {
-	gameState.currentCell = event.Cell
+func (g *gameState) handleSingleClick(event Event) {
+	g.currentCell = event.Cell
 
 	if !event.Modifiers.Ctrl {
-		gameState.selectionMode = selectionSelect
-		gameState.sudoku.unselectAllCells()
-		gameState.sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
-		gameState.selectionMode = selectionSelect
+		g.selectionMode = selectionSelect
+		g.sudoku.deselectAllCells()
+		g.sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
+		g.selectionMode = selectionSelect
 		return
 	}
 
-	if gameState.sudoku.isSelected(event.Cell.Col, event.Cell.Row) {
-		gameState.selectionMode = selectionDeselect
+	if g.sudoku.at(event.Cell.Col, event.Cell.Row).selected {
+		g.selectionMode = selectionDeselect
 	} else {
-		gameState.selectionMode = selectionSelect
+		g.selectionMode = selectionSelect
 	}
-	gameState.sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
+	g.sudoku.toggleSelection(event.Cell.Col, event.Cell.Row)
 }
 
-func handleDeleteKey(event Event, gameState *gameState) {
-	gameState.undoHistory.begin()
-	defer gameState.undoHistory.commit()
+func (g *gameState) handleDeleteKey(event Event) {
+	g.undoHistory.begin()
+	defer g.undoHistory.commit()
 
 	switch {
 	case event.Modifiers.Ctrl && event.Modifiers.Shift:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+		g.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			cell.Colors.clear()
 		})
 	case event.Modifiers.Shift:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+		g.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			before := *cell
 			cell.clearCornerMarks()
-			gameState.undoHistory.record(pos, before, *cell)
+			g.undoHistory.record(pos, before, *cell)
 		})
 	case event.Modifiers.Ctrl:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+		g.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			before := *cell
 			cell.clearCenterMarks()
-			gameState.undoHistory.record(pos, before, *cell)
+			g.undoHistory.record(pos, before, *cell)
 		})
 	default:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+		g.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			before := *cell
 			cell.clearNumber()
-			gameState.undoHistory.record(pos, before, *cell)
+			g.undoHistory.record(pos, before, *cell)
 		})
 	}
 }
 
-func handleArrowKey(event Event, gameState *gameState) {
+func (g *gameState) handleArrowKey(event Event) {
 	moveDir, ok := arrowKeyDirection(event.Key)
 	if !ok {
 		return
 	}
 
-	gameState.currentCell.move(moveDir)
+	g.currentCell.move(moveDir)
 
 	if !event.Modifiers.Ctrl && !event.Modifiers.Shift {
-		gameState.sudoku.unselectAllCells()
-		gameState.sudoku.selectCell(gameState.currentCell.Col, gameState.currentCell.Row)
+		g.sudoku.deselectAllCells()
+		g.sudoku.selectCell(g.currentCell.Col, g.currentCell.Row)
 		return
 	}
 
-	switch gameState.selectionMode {
+	switch g.selectionMode {
 	case selectionSelect:
-		gameState.sudoku.selectCell(gameState.currentCell.Col, gameState.currentCell.Row)
+		g.sudoku.selectCell(g.currentCell.Col, g.currentCell.Row)
 	case selectionDeselect:
-		gameState.sudoku.deselectCell(gameState.currentCell.Col, gameState.currentCell.Row)
+		g.sudoku.deselectCell(g.currentCell.Col, g.currentCell.Row)
 	}
 }
 
-func handleNumberKey(event Event, gameState *gameState) {
+func (g *gameState) handleNumberKey(event Event) {
 	value := event.Key.Value()
 	index := value - 1
 
-	gameState.undoHistory.begin()
-	defer gameState.undoHistory.commit()
+	g.undoHistory.begin()
+	defer g.undoHistory.commit()
 
 	switch {
 	case event.Modifiers.Ctrl && event.Modifiers.Shift:
 		if index < len(cellColors) {
-			gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+			g.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 				before := *cell
 				cell.toggleColor(index)
-				gameState.undoHistory.record(pos, before, *cell)
+				g.undoHistory.record(pos, before, *cell)
 			})
 		}
 	case event.Modifiers.Shift:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+		g.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			if cell.isEmpty() {
 				before := *cell
 				cell.toggleCornerMark(index)
-				gameState.undoHistory.record(pos, before, *cell)
+				g.undoHistory.record(pos, before, *cell)
 			}
 		})
 	case event.Modifiers.Ctrl:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+		g.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			if cell.isEmpty() {
 				before := *cell
 				cell.toggleCenterMark(index)
-				gameState.undoHistory.record(pos, before, *cell)
+				g.undoHistory.record(pos, before, *cell)
 			}
 		})
 	default:
-		gameState.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
+		g.sudoku.forEachSelectedCell(func(pos Cell, cell *cellState) {
 			if !cell.Given {
 				before := *cell
 				cell.Value = value
-				gameState.undoHistory.record(pos, before, *cell)
+				g.undoHistory.record(pos, before, *cell)
 			}
 		})
 	}
 }
 
-func pasteSudoku() (*gameState, error) {
+func loadSudokuFromClipboard() (*gameState, error) {
 	id, err := clipboard.ReadAll()
 	if err != nil {
-		return nil, fmt.Errorf("WARNING: pasting of clipboard content failed: %w", err)
+		return nil, fmt.Errorf("pasting of clipboard content failed: %w", err)
 	}
 
 	id = strings.TrimSpace(id)
 
 	newGameState, err := loadGameState(id)
 	if err != nil {
-		return nil, fmt.Errorf("WARNING: loading of sudoku with id %q failed: %w", id, err)
+		return nil, fmt.Errorf("loading of sudoku with id %q failed: %w", id, err)
 	}
 
 	return newGameState, nil

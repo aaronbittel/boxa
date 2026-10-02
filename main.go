@@ -16,14 +16,58 @@ import (
 //go:embed fonts/DejaVuSans.ttf
 var fontBytes []byte
 
+type gameMode int
+
+const (
+	modePlaying gameMode = iota
+	modeSolving
+	modeSolved
+	modeUnsolveable
+)
+
+func (m gameMode) String() string {
+	switch m {
+	case modePlaying:
+		return "Playing"
+	case modeSolving:
+		return "Solving"
+	case modeSolved:
+		return "Solved"
+	case modeUnsolveable:
+		return "Unsolveable"
+	default:
+		panic(fmt.Sprintf("unhandled game mode %d", m))
+	}
+}
+
 type gameState struct {
-	id             string
-	sudoku         *sudoku
-	undoHistory    *undoHistory
-	elapsed        time.Duration
-	currentCell    Cell
-	selectionMode  selectionMode
-	sudokuIsSolved bool
+	id            string
+	sudoku        *sudoku
+	undoHistory   *undoHistory
+	elapsed       time.Duration
+	currentCell   Cell
+	selectionMode selectionMode
+	mode          gameMode
+	solver        *solver
+}
+
+func newGameState(id string, sudoku *sudoku) *gameState {
+	return &gameState{
+		id:          id,
+		sudoku:      sudoku,
+		undoHistory: new(undoHistory),
+		solver:      newSolver(),
+	}
+}
+
+func gameStateFromSaveState(save SaveState) *gameState {
+	return &gameState{
+		id:          save.ID,
+		sudoku:      save.Sudoku,
+		undoHistory: save.UndoHistory,
+		elapsed:     save.Elapsed,
+		solver:      newSolver(),
+	}
 }
 
 var debug = false
@@ -52,26 +96,42 @@ func main() {
 	rl.SetTargetFPS(60)
 
 	for !rl.WindowShouldClose() {
-		if !game.sudokuIsSolved {
-			events := input.poll()
+		events := input.poll()
 
-			for _, event := range events {
-				if debug {
-					fmt.Println("event", event, "selectionMode", game.selectionMode)
-				}
-				newGameState, err := handleEvent(event, game)
+		for _, event := range events {
+			if event.Key == KeyV && event.Modifiers.Ctrl {
+				newGameState, err := loadSudokuFromClipboard()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "WARNING: %s", err)
 					continue
 				}
 				game = newGameState
+				continue
+			}
+
+			if debug {
+				fmt.Println("event", event, "selectionMode", game.selectionMode)
+			}
+
+			switch game.mode {
+			case modePlaying:
+				if err := game.handlePlayingEvent(event); err != nil {
+					fmt.Fprintf(os.Stderr, "WARNING: %s", err)
+					continue
+				}
 
 				if game.sudoku.isSolved() {
-					game.sudokuIsSolved = true
+					game.mode = modeSolved
 					duration = game.elapsed + time.Since(start)
-					break
 				}
+			case modeSolving, modeSolved, modeUnsolveable: // do nothing
+			default:
+				panic(fmt.Sprintf("unhandled game mode %q", game.mode))
 			}
+		}
+
+		if game.mode == modeSolving {
+			game.updateSolver()
 		}
 
 		rl.BeginDrawing()
@@ -81,13 +141,8 @@ func main() {
 		drawSelectedBorders(*game.sudoku)
 		drawSudoku(*game.sudoku, font)
 
-		bgColor := borderColor
-		if game.sudokuIsSolved {
-			bgColor = solvedSudokuBorderColor
-		}
-
-		drawGrid(bgColor)
-		if game.sudokuIsSolved {
+		drawGrid(borderColor(game.mode))
+		if game.mode == modeSolved {
 			drawSudokuSolvedScreen(duration, font)
 		}
 
@@ -125,24 +180,45 @@ func main() {
 	fmt.Printf("INFO: saved state %q\n", saveStateFilename)
 }
 
+func (g *gameState) updateSolver() {
+	if !g.solver.started {
+		g.solver.started = true
+		go func() {
+			g.solver.done <- sudokuSolveBacktracking(*g.sudoku, Cell{}, g.solver.changes)
+		}()
+	}
+	select {
+	case change, ok := <-g.solver.changes:
+		if !ok {
+			g.solver.changes = nil
+			break
+		}
+		g.sudoku.deselectAllCells()
+		g.sudoku.set(change.pos, cellState{
+			selected: change.selected,
+			Value:    change.value,
+		})
+	case solved := <-g.solver.done:
+		if solved {
+			g.mode = modeSolved
+		} else {
+			g.mode = modeUnsolveable
+		}
+		g.solver.done = nil
+	default: // continue
+	}
+}
+
 func loadGameState(id string) (*gameState, error) {
 	if id == "" {
-		return &gameState{
-			sudoku:      initFilledSudoku(),
-			undoHistory: &undoHistory{},
-		}, nil
+		return newGameState(id, initFilledSudoku()), nil
 	}
 
-	saveState, err := loadSaveState(id)
+	save, err := loadSaveState(id)
 	switch {
 	case err == nil:
-		if saveState.ID == id {
-			return &gameState{
-				id:          id,
-				sudoku:      saveState.Sudoku,
-				undoHistory: saveState.UndoHistory,
-				elapsed:     saveState.Elapsed,
-			}, nil
+		if save.ID == id {
+			return gameStateFromSaveState(*save), nil
 		}
 
 	case !errors.Is(err, os.ErrNotExist):
@@ -151,14 +227,10 @@ func loadGameState(id string) (*gameState, error) {
 
 	sudoku, err := fetchSudoku(id)
 	if err != nil {
-		return nil, fmt.Errorf("fetching sudoku with id %s: %w", id, err)
+		return nil, err
 	}
 
-	return &gameState{
-		id:          id,
-		sudoku:      sudoku,
-		undoHistory: &undoHistory{},
-	}, nil
+	return newGameState(id, sudoku), nil
 }
 
 func fetchSudoku(id string) (*sudoku, error) {
@@ -177,7 +249,7 @@ func fetchSudoku(id string) (*sudoku, error) {
 			if data.Cells[y][x].Value != "" {
 				n, err := strconv.Atoi(data.Cells[y][x].Value)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("parse cell value %q: %w", data.Cells[y][x].Value, err)
 				}
 				sudoku[y][x].Value = n
 				sudoku[y][x].Given = true

@@ -129,10 +129,6 @@ func (s *sudoku) forEachSelectedCell(fn func(pos Cell, cell *cellState)) {
 	}
 }
 
-func (s *sudoku) isSelected(x, y int) bool {
-	return s[y][x].selected
-}
-
 func (s *sudoku) selectCell(x, y int) {
 	s[y][x].selected = true
 }
@@ -145,7 +141,7 @@ func (s *sudoku) toggleSelection(x, y int) {
 	s[y][x].selected = !s[y][x].selected
 }
 
-func (s *sudoku) unselectAllCells() {
+func (s *sudoku) deselectAllCells() {
 	for y := range cellCount {
 		for x := range cellCount {
 			s[y][x].selected = false

@@ -71,7 +71,7 @@ type undoHistory struct {
 }
 
 func (u *undoHistory) undo(s *sudoku) {
-	s.unselectAllCells()
+	s.deselectAllCells()
 
 	if !u.canUndo() {
 		return
@@ -90,7 +90,7 @@ func (u *undoHistory) redo(s *sudoku) {
 		return
 	}
 
-	s.unselectAllCells()
+	s.deselectAllCells()
 
 	for cell, change := range u.Entries[u.Cursor] {
 		change.Before.selected = true

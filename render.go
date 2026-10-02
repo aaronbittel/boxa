@@ -28,10 +28,12 @@ const (
 var (
 	backgroundColor             = rl.RayWhite
 	numberColor                 = rl.Blue
-	borderColor                 = rl.Black
+	defaultBorderColor          = rl.Black
 	givenNumberColor            = rl.Black
 	highlightColor              = rl.NewColor(0x4C, 0xA4, 0xFF, 0xFF)
-	solvedSudokuBorderColor     = rl.Green
+	solvedBorderColor           = rl.Green
+	unsolveableBorderColor      = rl.Red
+	solvingBorderColor          = rl.Yellow
 	conflictCellColor           = rl.NewColor(0xD9, 0x9C, 0x9C, 0xFF)
 	conflictPencilMarkColor     = rl.NewColor(0xBB, 0x4E, 0x4E, 0xFF)
 	conflictBorderColor         = rl.NewColor(0x80, 0x6F, 0x9C, 0xFF)
@@ -75,7 +77,7 @@ func drawGrid(borderColor color.RGBA) {
 		if y%3 == 0 {
 			t = borderThickness
 		}
-		rl.DrawLineEx(start, end, t, borderColor)
+		rl.DrawLineEx(start, end, t, defaultBorderColor)
 	}
 
 	for x := 1; x < cellCount; x++ {
@@ -86,7 +88,7 @@ func drawGrid(borderColor color.RGBA) {
 		if x%3 == 0 {
 			t = borderThickness
 		}
-		rl.DrawLineEx(start, end, t, borderColor)
+		rl.DrawLineEx(start, end, t, defaultBorderColor)
 	}
 
 }
@@ -119,9 +121,9 @@ func drawSudokuSolvedScreen(duration time.Duration, font rl.Font) {
 		Y: bg.Y + bg.Height*0.5,
 	}
 
-	rl.DrawRectangleRounded(bg, 0.4, 32, solvedSudokuBorderColor)
+	rl.DrawRectangleRounded(bg, 0.4, 32, solvedBorderColor)
 	rl.DrawTextEx(font, congratsText, congratsTextPos, textFontSize, spacing, solvedScreenBackgroundColor)
-	rl.DrawTextEx(font, timeText, timeTextPos, textFontSize, spacing, solvedSudokuBorderColor)
+	rl.DrawTextEx(font, timeText, timeTextPos, textFontSize, spacing, solvedBorderColor)
 }
 
 func drawSudoku(s sudoku, font rl.Font) {
@@ -385,6 +387,21 @@ func drawColoredCellBackground(cell *cellState, x, y int, tint float32) {
 
 func drawConflictCellBackground(x, y int) {
 	rl.DrawRectangle(int32(x*cellSize), int32(y*cellSize), cellSize, cellSize, conflictCellColor)
+}
+
+func borderColor(mode gameMode) color.RGBA {
+	switch mode {
+	case modePlaying:
+		return defaultBorderColor
+	case modeSolved:
+		return solvedBorderColor
+	case modeUnsolveable:
+		return unsolveableBorderColor
+	case modeSolving:
+		return solvingBorderColor
+	default:
+		return defaultBorderColor
+	}
 }
 
 func tintTowardsRed(c rl.Color, amount float32) rl.Color {
