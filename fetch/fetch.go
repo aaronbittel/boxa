@@ -69,7 +69,7 @@ func FetchSudoku(id string) (boardData, error) {
 
 	var data boardData
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return boardData{}, fmt.Errorf("decode board data: %w", err)
+		return boardData{}, fmt.Errorf("decode metadata: %w", err)
 	}
 
 	return data, nil
